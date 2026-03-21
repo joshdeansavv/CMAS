@@ -32,6 +32,37 @@ echo -e "${CYAN}${BOLD}  │   Cognitive Multi-Agent System      │${NC}"
 echo -e "${CYAN}${BOLD}  └─────────────────────────────────────┘${NC}"
 echo ""
 
+# ── Disclaimer ────────────────────────────────────────────────────
+echo -e "${RED}${BOLD}  DISCLAIMER & ASSUMPTION OF RISK${NC}"
+echo -e "${DIM}  ─────────────────────────────────────────────────────────────${NC}"
+echo -e "  This script installs software, creates a Python virtual environment,"
+echo -e "  writes configuration files, and may execute shell commands on your system."
+echo ""
+echo -e "  ${BOLD}By continuing, you acknowledge and agree that:${NC}"
+echo ""
+echo -e "  ${DIM}1.${NC} You are running this script voluntarily on a system you own or"
+echo -e "     have explicit authorization to modify."
+echo -e "  ${DIM}2.${NC} CMAS executes AI-generated code, shell commands, and file operations"
+echo -e "     autonomously. You are responsible for supervising its actions."
+echo -e "  ${DIM}3.${NC} The authors and contributors of CMAS bear no liability for any"
+echo -e "     damage, data loss, security incidents, or unintended consequences"
+echo -e "     arising from the use of this software."
+echo -e "  ${DIM}4.${NC} This software is provided AS-IS under the PolyForm Noncommercial"
+echo -e "     License 1.0.0, with no warranty of any kind, express or implied."
+echo -e "  ${DIM}5.${NC} You assume full and sole responsibility for any outcome."
+echo ""
+echo -e "${DIM}  ─────────────────────────────────────────────────────────────${NC}"
+echo ""
+ask "  Type  YES  to accept and continue, or press Ctrl+C to exit: "
+read -r ACCEPT
+echo ""
+if [ "$ACCEPT" != "YES" ]; then
+    fail "Setup cancelled. You must type YES (all caps) to proceed."
+    exit 1
+fi
+ok "Disclaimer accepted."
+echo ""
+
 # ── Security Warning ──────────────────────────────────────────────
 echo -e "${YELLOW}${BOLD}  SECURITY NOTICE: Keys are stored exclusively in '.env' and are completely ignored by git. NEVER share or commit your .env file!${NC}"
 echo ""
