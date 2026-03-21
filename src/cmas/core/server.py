@@ -42,10 +42,8 @@ class CMASServer:
         self.chat_handler.gateway = self.gateway
         self.gateway.set_chat_handler(self.chat_handler)
 
-        # Channels
+        # Channels (Strictly localhost web interface for now)
         self.web_channel = WebChannel(self.gateway)
-        self.discord_channel = None
-        self.whatsapp_channel = None
         self.channels = {"web": self.web_channel}
 
         # Set up push callback for proactive messages
@@ -88,23 +86,7 @@ class CMASServer:
         # Health check
         app.router.add_get("/health", self._health_handler)
 
-        # WhatsApp webhook (if enabled)
-        if self.config.whatsapp_enabled:
-            try:
-                from ..channels.whatsapp import WhatsAppChannel
-                wa_cfg = self.config.channels["whatsapp"]
-                self.whatsapp_channel = WhatsAppChannel(
-                    self.gateway,
-                    twilio_sid=wa_cfg.get("twilio_sid", ""),
-                    twilio_token=wa_cfg.get("twilio_token", ""),
-                    phone=wa_cfg.get("phone", ""),
-                )
-                self.channels["whatsapp"] = self.whatsapp_channel
-                app.router.add_post("/webhook/whatsapp", self.whatsapp_channel.webhook_handler)
-                print("[Server] WhatsApp webhook enabled at /webhook/whatsapp")
-            except Exception as e:
-                print(f"[Server] WhatsApp setup failed: {e}")
-
+        # External channels explicitly disabled to isolate localhost gateway
         return app
 
     async def _serve_index(self, request: web.Request) -> web.Response:
@@ -119,26 +101,7 @@ class CMASServer:
         health["sessions"] = len(self.web_channel.connections)
         return web.json_response(health)
 
-    async def _start_discord(self):
-        """Start Discord bot if configured."""
-        if not self.config.discord_enabled or not self.config.discord_token:
-            return
-        try:
-            from ..channels.discord_bot import DiscordChannel
-            self.discord_channel = DiscordChannel(self.gateway, self.config.discord_token)
-            self.channels["discord"] = self.discord_channel
-            
-            async def run_discord():
-                try:
-                    await self.discord_channel.start()
-                except Exception as e:
-                    print(f"\n[Discord Error] Bot crashed or failed to login: {e}")
-                    
-            task = asyncio.create_task(run_discord())
-            self._background_tasks.append(task)
-            print("[Server] Discord bot starting...")
-        except Exception as e:
-            print(f"[Server] Discord setup failed: {e}")
+    # External platforms like Discord disconnected by C2 architectural mandate
 
     async def _start_scheduler(self):
         """Start background scheduler if enabled."""
@@ -184,7 +147,6 @@ class CMASServer:
 
         # Initialize optional components
         await self._start_vector_memory()
-        await self._start_discord()
         await self._start_scheduler()
 
         # Build and start HTTP server
@@ -202,18 +164,16 @@ class CMASServer:
         print(f"  Web UI:  {url}")
         print(f"  WS:      ws://localhost:{self.config.port}/ws")
         print(f"  Health:  {url}/health")
-        if self.config.discord_enabled:
-            print(f"  Discord: connected")
-        if self.config.whatsapp_enabled:
-            print(f"  WhatsApp: {url}/webhook/whatsapp")
         print(f"  {'─'*40}")
-        print(f"  Ready. Open {url} to chat.\n")
+        print(f"  Ready. Open {url} to command the Swarm natively.\n")
 
         # Keep running forever
         try:
             await asyncio.Event().wait()
         except (KeyboardInterrupt, asyncio.CancelledError):
-            print("\n[Server] Shutting down...")
+            print("\n[Mission Control] Safety Shutdown engaged... cleaning up Gateway C2 loops.")
             for task in self._background_tasks:
                 task.cancel()
+            if hasattr(self, 'web_channel'):
+                await self.web_channel.close_all()
             await runner.cleanup()
