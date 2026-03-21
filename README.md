@@ -1,33 +1,33 @@
 <div align="center">
-  
   <h1>🧠 CMAS</h1>
-  <h3>Cognitive Multi-Agent System</h3>
+  <h3>Your Own Personal AI Assistant. Any Platform. The Cognitive Way. 🧠</h3>
+
+  <p>
+    <a href="#"><img alt="License" src="https://img.shields.io/badge/License-Non--Commercial-blue.svg"></a>
+    <a href="#"><img alt="Python version" src="https://img.shields.io/badge/python-3.9+-blue.svg"></a>
+    <a href="#"><img alt="React UI" src="https://img.shields.io/badge/UI-React%20%2B%20Vite-61DAFB?logo=react&logoColor=white"></a>
+    <a href="#"><img alt="Stars" src="https://img.shields.io/github/stars/joshdeansavv/CMAS?style=social"></a>
+  </p>
+
   <p><em>An always-on, highly-steerable agentic framework powered by brain-inspired intelligence.</em></p>
-
-  [![License](https://img.shields.io/badge/License-Non--Commercial-blue.svg)](#)
-  [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
-  [![React UI](https://img.shields.io/badge/UI-React%20%2B%20Vite-61DAFB?logo=react&logoColor=white)](#)
-
 </div>
 
 ---
 
-> **CMAS** is a persistent AI framework that runs 24/7. It dynamically spawns specialized sub-agents, launches deep multi-step research investigations, safely executes code, manages custom long-term persistence, and actively learns from every interaction using localized dopamine-reward pathways.
+> **CMAS** is a persistent, 24/7 AI platform that dynamically spawns specialized sub-agents, launches deep multi-step research investigations, safely executes code, manages custom long-term persistence, and actively learns from every interaction using localized dopamine-reward pathways.
 
-## ✨ Key Features
+## ✨ Highlights
 
-- **🌐 Stunning Interactive Dashboard:** A brand new, production-grade Vite+React Single Page Application featuring Glassmorphism, Dark Mode, and robust WebSocket reconnects.
-- **👁️ Live Observability HUD:** Monitor exactly what your specialized sub-agents are doing autonomously with real-time Roster Tracking and a streaming Telemetry Log that prevents chat spam.
-- **🎮 Ultimate Interactivity (Steering):** Click the *Steer* button to seamlessly interrupt a thinking agent's Async LLM loop, forcing an explicit course-correction without breaking context!
-- **🤖 Autonomous Auto-Delegation:** CMAS can spin up highly specialized sub-agents (e.g., `ResearchAgent`, `AnalystAgent`) to divide and conquer large data analysis objectives independently.
-- **📍 Universal Access:** Talk to your cluster locally via the Web Dashboard, or hook it up natively to **Discord** and **WhatsApp (Twilio)**.
-- **🧠 Brain-Inspired Architecture:** Features Hebbian learning, default-mode network background thinking, and a built-in dopamine-driven reward loop for strategy refinement.
+* **100% Autonomous:** Capable of running long-term tasks without supervision.
+* **Brain-Inspired Metrics:** Uses Hebbian weighting and Default-Mode Network (DMN) states to learn in the background.
+* **Highly Steerable:** Send immediate override commands to the internal cognitive loop even while it's mid-thought.
+* **Open & Private:** No forced cloud vendors. Plug in your own `.env` API keys for **OpenAI**, **Local HuggingFace TGI**, or **Ollama**.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick start (TL;DR)
 
-Getting started with CMAS takes less than 60 seconds thanks to our interactive bash wizard!
+Getting started with CMAS takes less than 60 seconds thanks to our interactive bash installer.
 
 ```bash
 # 1. Clone the repository
@@ -41,64 +41,77 @@ cd CMAS
 ./start.sh
 ```
 
-> **Note:** The `setup.sh` wizard actively provisions your Python environment (`.venv`), registers dynamic tools, downloads required libraries, and interactively configures your preferred Local or Cloud LLMs! 
+---
+
+## 📦 Everything we built so far
+
+CMAS isn't just a chatbot, it's a rapidly expanding entire ecosystem of specialized nodes, channels, and apps.
+
+### Core Platform
+- **Orchestrator Node:** The central routing processor that decomposes goals into sub-tasks via `PERCEIVE → PLAN → EXECUTE → EVALUATE`.
+- **Memory Consolidation:** Automatic translation of long-lived chat history into vectorized Schemas.
+- **Personality Configurator:** Dynamically load `personality.yaml` settings to adjust logic boundaries and constraints.
+
+### Channels
+Access your AI Assistant from wherever you are. Messages instantly synchronize state across all networks.
+- [x] **WebChat:** Locally hosted Vite/React GUI via `http://localhost:8080`.
+- [x] **Discord:** Native bot integration via `@Mentions` and DMs.
+- [x] **WhatsApp:** Enterprise hooks via Twilio messaging layer.
+
+### Apps & Nodes
+- **Live Observability HUD:** The React web app directly streams gateway events, rendering internal loop thoughts without polluting the chat.
+- **Agent Roster:** Watch specialized sub-agents (`ResearchAgent`, `AnalystAgent`) get dynamically spawned and tore down by the main orchestrator in real time.
+- **Background Job Scheduler:** Inject autonomous CRON jobs via natural language (e.g. *"Remind me to check server health at 9am"*).
+
+### Tools & Automation
+CMAS ships with a powerful native capability registry out-of-the-box.
+- **Local Bash Access:** Run sandboxed shell commands safely on the host machine.
+- **System Crawler:** Native disk-read operations and file synthesis execution.
+- **Dynamic Sub-Agent Spawning:** Agents can `find_sessions`, `switch_sessions`, and orchestrate entirely new hierarchical agent worker colonies for big tasks.
+
+### Runtime & Safety
+- **Anti-Spam Gateway Loop:** Intelligent circuit-breakers detect recursive logic loops and physically halt runaway LLM execution.
+- **Explicit Workspace Sandboxing:** All file system mutations are hard-coded to strict `/workspace/` subdirectories to prevent host machine gunking.
+- **Interactive Steering Protocol:** Inject raw commands directly to the core inference threads bypassing the conversational interface.
 
 ---
 
-## 🏗️ Architecture & Cognitive Loop
+## ⚙️ How it works (short)
 
-CMAS does not just generate text—it *thinks*. The core loop is mapped to neuroscience models:
+When you ask CMAS to accomplish a task via Discord or Web, it travels through several cognitive phases:
 
 ```mermaid
 graph TD
-    A[PERCEIVE] --> B[PLAN]
-    B --> C[EXECUTE]
-    C --> D[EVALUATE]
-    D --> E[REFLECT]
-    E --> F[LEARN]
-    F -.-> A
+    A[PERCEIVE User Input] --> B{Threat or Priority?}
+    B -->|Somatic Marker| C[PLAN Step]
+    C --> D[SPAWN Agents]
+    D --> E[EXECUTE Tools]
+    E --> F[EVALUATE Results]
+    F --> G[REFLECT & LEARN]
+    G -.-> H((MEMORY))
+    H -.-> A
 ```
 
-### Brain Systems
-- **Neural Pathways** — Hebbian learning ensures that strategies that work grow stronger over time.
-- **Dopamine System** — Fast prediction error signals drive automated trial-and-error strategy learning.
-- **Priority Detection** — Fast threat and importance assessments using Somatic markers.
-- **Memory Consolidation** — Automatically extracts reusable algorithmic blueprints after completing heavy tasks.
+1. The **Gateway** normalizes your input across any incoming channel.
+2. The **Orchestrator** loads your active `Session Context` from SQLite.
+3. CMAS recursively spins up `chat_with_tools` loops to query duckduckgo, read files, or launch sub-agents.
+4. If a loop is infinite or hanging, the **Gateway Guardrails** snap it gracefully.
+5. In idle periods, CMAS fires up the **Default Mode Network (DMN)** to ponder your old questions and generate "creative insights" stored via ChromaDB.
 
 ---
 
-## 🖥️ Professional React Web Dashboard
+## 🔒 Security model (important)
 
-CMAS boasts a world-class Web Dashboard available natively at `http://localhost:8080`.
-
-<div align="center">
-  <kbd>
-    <img src="https://via.placeholder.com/800x450/0f172a/3b82f6?text=Screenshot:+Vite+React+Glassmorphism+Dashboard" alt="CMAS UI" />
-  </kbd>
-</div>
-
-* **History Restoration:** Automatically rehydrates your session context and chat streams across hard refreshes.
-* **Agent Context Switching:** CMAS can intelligently surf its own SQLite `.db` databases to seamlessly pull up older projects natively in the UI.
-* **Custom Reminders API:** Build persistent, scheduled Background Jobs utilizing natural language right from the sidebar.
+**Your data stays yours.**
+* API Keys (`OPENAI_API_KEY`) are stored explicitly in your untracked `.env` file. They never leave your device.
+* All `write_file` and `exec` tool definitions are firmly rooted inside `src/cmas/workspace`.
+* Local `.db` files remain locally encrypted natively on your disk.
 
 ---
 
-## 🛠️ Configuration & Models
+## 📚 Psychological Foundations
 
-CMAS supports extreme flexibility. Users can toggle custom system instructions securely utilizing `personality.yaml`.
-
-Additionally, thanks to our Open API configurations in `.env`, you can utilize:
-* **OpenAI Base Models** (e.g. `gpt-4o`)
-* **Local HuggingFace Endpoints / TGI**
-* **Ollama Servers**
-
-API configuration is kept highly secure; API keys are explicitly sandboxed to untracked `.env` files protecting you dynamically from scraping bots!
-
----
-
-## 📚 Specialized Research Foundations
-
-Our cognition logic maps deeply to verified psychological parameters:
+Our cognitive logic is meticulously mapped to highly verified academic frameworks:
 
 | Concept | Source | Implementation |
 |---------|--------|---------------|
