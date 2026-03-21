@@ -191,17 +191,10 @@ class CMASServer:
         """Stop all running tasks in a project without deleting it."""
         project_id = request.match_info["project_id"]
         try:
-            all_tasks = self.hub.get_all_tasks()
-            stopped = 0
-            for t in all_tasks:
-                if t.project_id == project_id and t.status.value in ("pending", "in_progress"):
-                    try:
-                        self.gateway.stop_task(t.id)
-                        stopped += 1
-                    except Exception:
-                        pass
+            # Cancel the orchestrator asyncio Task (real interrupt, not just a flag)
+            self.chat_handler.cancel_project(project_id)
             self.hub.stop_project_tasks(project_id)
-            return web.json_response({"ok": True, "project_id": project_id, "stopped": stopped})
+            return web.json_response({"ok": True, "project_id": project_id})
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
 
@@ -291,6 +284,8 @@ class CMASServer:
             await asyncio.Event().wait()
         except (KeyboardInterrupt, asyncio.CancelledError):
             print("\n[Mission Control] Safety Shutdown engaged... cleaning up Gateway C2 loops.")
+            # Cancel all running research/orchestrator tasks so LLM API calls stop immediately
+            self.chat_handler.cancel_all()
             for task in self._background_tasks:
                 task.cancel()
             if hasattr(self, 'web_channel') and hasattr(self.web_channel, 'C2_TERMINATE_ALL_CONNECTIONS'):

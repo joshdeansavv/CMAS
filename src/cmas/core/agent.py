@@ -238,13 +238,6 @@ COGNITIVE GUIDELINES:
         self.hub.update_task(task.id, status="in_progress", assigned_to=self.name)
 
         self._log(f"Starting task: {task.description[:80]}")
-        if self.progress_callback:
-            try:
-                await self.progress_callback(
-                    f"{self.name} starting: {task.description[:80]}", self.name
-                )
-            except Exception:
-                pass
 
         # ── Phase 1: REASON ──────────────────────────────────────
         reasoning_context = await self._reason_about_task(task.description)
@@ -298,14 +291,6 @@ COGNITIVE GUIDELINES:
             self.hub.update_task(task.id, status="done", result=result[:2000])
             self.hub.set_agent_status(self.name, "idle", project_id=task.project_id)
             self._log(f"Completed task: {task.description[:60]}...")
-            if self.progress_callback:
-                try:
-                    brief = result.replace('\n', ' ')[:120]
-                    await self.progress_callback(
-                        f"{self.name} completed — {brief}", self.name
-                    )
-                except Exception:
-                    pass
 
             # Save result to workspace
             result_path = self.workspace / f"result_{task.id[:8]}.md"

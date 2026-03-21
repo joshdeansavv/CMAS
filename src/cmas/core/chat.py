@@ -314,11 +314,28 @@ class ChatHandler:
         self._control_callback: Optional[Callable] = None  # for pushing UI control commands
         self._db_path = scheduler_db_path or config.sqlite_path
         self._steering_queues: Dict[str, asyncio.Queue] = {}
+        # Track running orchestrator asyncio Tasks keyed by project_id so we can cancel them
+        self._active_research_tasks: Dict[str, asyncio.Task] = {}
 
     def apply_steering(self, session_id: str, text: str):
         if session_id not in self._steering_queues:
             self._steering_queues[session_id] = asyncio.Queue()
         self._steering_queues[session_id].put_nowait(text)
+
+    def cancel_project(self, project_id: str):
+        """Cancel all running orchestrator tasks for a project."""
+        task = self._active_research_tasks.pop(project_id, None)
+        if task and not task.done():
+            task.cancel()
+            print(f"[ChatHandler] Cancelled orchestrator task for project {project_id}")
+
+    def cancel_all(self):
+        """Cancel every running research task — used on server shutdown."""
+        for project_id, task in list(self._active_research_tasks.items()):
+            if task and not task.done():
+                task.cancel()
+                print(f"[ChatHandler] Shutdown: cancelled task for project {project_id}")
+        self._active_research_tasks.clear()
 
     def set_push_callback(self, cb: Callable):
         """Set callback for pushing messages to users: cb(session_id, channel, text)."""
@@ -593,7 +610,11 @@ class ChatHandler:
 
         async def handle_deep_research(goal: str, **kw) -> str:
             await push_progress(f"Launching deep research swarm: \"{goal}\"")
-            asyncio.create_task(self._run_deep_research(goal, session))
+            # Cancel any existing research for this project before starting a new one
+            self.cancel_project(session.project_id)
+            t = asyncio.create_task(self._run_deep_research(goal, session))
+            if session.project_id:
+                self._active_research_tasks[session.project_id] = t
             return f"Deep research launched on: **{goal}**\n\nI've deployed a multi-agent swarm to investigate this. I'll stream progress updates here and send you the full report when complete."
 
         async def handle_remember(topic: str, content: str, category: str = "note", **kw) -> str:
@@ -747,7 +768,6 @@ class ChatHandler:
 
             project_dir = get_project_dir(goal)
 
-            # Progress callback: pipes orchestrator/agent events into the chat stream
             async def _progress(text: str, agent: str = ""):
                 if self._control_callback:
                     try:
@@ -758,7 +778,6 @@ class ChatHandler:
                     except Exception:
                         pass
 
-            # Inject the server's Hub, Gateway, Memory, and progress callback
             orchestrator = Orchestrator(
                 project_dir=project_dir,
                 model=self.config.research_model,
@@ -773,12 +792,27 @@ class ChatHandler:
             )
             result = await orchestrator.run(goal)
 
-            # Send the full synthesized report directly into the chat
             if self._push_callback:
                 await self._push_callback(session.session_id, session.channel, result)
+
+        except asyncio.CancelledError:
+            # Clean stop — notify the user and mark all project tasks killed
+            print(f"[ChatHandler] Research cancelled for project {session.project_id}")
+            self.gateway.hub.stop_project_tasks(session.project_id)
+            if self._control_callback:
+                try:
+                    await self._control_callback(
+                        session.session_id, session.channel,
+                        {"type": "progress", "text": "Swarm stopped by Mission Control.", "agent": "Orchestrator"}
+                    )
+                except Exception:
+                    pass
         except Exception as e:
             if self._push_callback:
                 await self._push_callback(
                     session.session_id, session.channel,
                     f"Deep research failed: {e}",
                 )
+        finally:
+            # Always clean up the task reference
+            self._active_research_tasks.pop(session.project_id, None)

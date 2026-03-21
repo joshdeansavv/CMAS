@@ -250,17 +250,13 @@ class WebChannel:
                         pid = data.get("project_id", project_id)
                         if pid:
                             try:
-                                all_tasks = self.gateway.hub.get_all_tasks()
-                                stopped = 0
-                                for t in all_tasks:
-                                    if t.project_id == pid and t.status.value in ("pending", "in_progress"):
-                                        try:
-                                            self.gateway.stop_task(t.id)
-                                            stopped += 1
-                                        except Exception:
-                                            pass
+                                # Cancel the orchestrator asyncio task (real stop)
+                                ch = getattr(self.gateway, '_chat_handler', None)
+                                if ch:
+                                    ch.cancel_project(pid)
+                                # Mark all DB tasks killed and agents idle
                                 self.gateway.hub.stop_project_tasks(pid)
-                                await ws.send_json({"type": "project_stopped", "project_id": pid, "stopped": stopped})
+                                await ws.send_json({"type": "project_stopped", "project_id": pid})
                             except Exception as e:
                                 await ws.send_json({"type": "error", "text": f"Failed to stop project: {e}"})
                         continue
@@ -269,13 +265,10 @@ class WebChannel:
                         pid = data.get("project_id", project_id)
                         if pid:
                             try:
-                                all_tasks = self.gateway.hub.get_all_tasks()
-                                for t in all_tasks:
-                                    if t.project_id == pid:
-                                        try:
-                                            self.gateway.stop_task(t.id)
-                                        except Exception:
-                                            pass
+                                # Cancel the orchestrator asyncio task first
+                                ch = getattr(self.gateway, '_chat_handler', None)
+                                if ch:
+                                    ch.cancel_project(pid)
                                 self.gateway.hub.stop_project_tasks(pid)
                                 self.gateway.hub.delete_project(pid)
                                 await ws.send_json({"type": "project_deleted", "project_id": pid})

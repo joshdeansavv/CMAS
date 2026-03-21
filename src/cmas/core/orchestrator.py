@@ -361,10 +361,7 @@ Return ONLY the JSON array."""},
         self.hub.remember("goal", goal)
         self.hub.remember("task_plan", json.dumps(tasks_data, indent=2))
 
-        # Emit plan to chat — agent names are determined at execution time, not here
-        for td in tasks_data:
-            agent_type = td.get("agent_type", "research")
-            await self._emit(f"Task queued [{agent_type}]: {td['description'][:90]}", "Orchestrator")
+        await self._emit(f"Pipeline ready — {len(tasks_data)} task{'s' if len(tasks_data) != 1 else ''} queued for execution.", "Orchestrator")
 
         # Human checkpoint
         human_input = await self._human_checkpoint(
@@ -436,7 +433,6 @@ Return ONLY the JSON array."""},
         async def run_one(task: Task):
             agent_type = self._task_agent_map.get(task.id, "research")
             agent = self._get_or_create_agent(agent_type)
-            await self._emit(f"Starting: {task.description[:80]}", agent.name)
 
             deps = self._task_deps.get(task.id, [])
             if deps:

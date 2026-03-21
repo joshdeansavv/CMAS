@@ -1095,6 +1095,14 @@ export default function App() {
             updated_at: Date.now() / 1000,
           }
         }));
+        // Remove from live strip when agent goes idle so animations stop
+        if (data.status === 'idle' || data.status === 'error') {
+          setLiveProgress(prev => {
+            const next = { ...prev };
+            delete next[data.agent];
+            return next;
+          });
+        }
         break;
       case 'task_update':
         setTasks(prev => {
@@ -1123,9 +1131,11 @@ export default function App() {
         const text  = data.text  || '';
         // Always update the live activity strip (per-agent, replaces in-place)
         setLiveProgress(prev => ({ ...prev, [agent || '_']: text }));
-        // Only bubble milestone events into the chat log
-        const isMilestone = /complet|synthes|starting|deploying|spawning|failed|done\b|report|task queue/i.test(text);
-        if (isMilestone) {
+        // Only add to chat for major orchestrator-level phase transitions
+        // Agent-level chatter (searching, starting tasks, completing tasks) stays in the strip only
+        const isOrchestratorPhase = agent === 'Orchestrator' &&
+          /pre-screening|mcts|decomposing|synthesiz|evaluating|metacog|launching/i.test(text);
+        if (isOrchestratorPhase) {
           setMessages(prev => [...prev, { role: 'progress', text, agent }]);
         }
         break;
@@ -1146,7 +1156,17 @@ export default function App() {
         }
         break;
       case 'project_stopped':
-        // Tasks will update via task_update broadcasts
+        // Clear live activity strip so stale animations disappear immediately
+        setLiveProgress({});
+        setRoster(prev => {
+          const next = { ...prev };
+          Object.keys(next).forEach(name => {
+            if (next[name].project_id === data.project_id) {
+              next[name] = { ...next[name], status: 'idle', current_task: '' };
+            }
+          });
+          return next;
+        });
         break;
       case 'message':
       case 'proactive':
