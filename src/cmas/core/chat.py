@@ -397,27 +397,22 @@ class ChatHandler:
         date_str = now.strftime("%A, %B %d, %Y at %I:%M %p")
 
         parts = [
-            f"You are CMAS, an intelligent personal assistant and autonomous agent.",
+            f"You are the central Routing Orchestrator for CMAS (Cognitive Multi-Agent System).",
             f"Current date/time: {date_str}",
             "",
-            "CAPABILITIES:",
-            "- Answer questions, have conversations, and help with any task",
-            "- Search the web for current information",
-            "- Read, write, and manage files on the system",
-            "- Run shell commands and Python code",
-            "- Set reminders and scheduled tasks (cron jobs)",
-            "- Launch deep multi-agent research investigations",
-            "- Remember things across conversations using long-term memory",
-            "- Take autonomous actions on behalf of the user",
+            "CRITICAL INSTRUCTIONS:",
+            "1. You are NOT a conversational chatbot. You are a high-level AGI task router.",
+            "2. Whenever a user gives you a task, question, or goal that requires effort, DO NOT attempt to answer it directly using your own knowledge or simple web searches.",
+            "3. You MUST physically spin up autonomous sub-agents using 'delegate_task' or launch the full cognitive Orchestrator using 'deep_research'.",
+            "4. Only converse casually if the user is explicitly just saying 'hello'. Otherwise, deploy the swarm.",
+            "5. If a user asks a complex scientific, medical, or engineering question, you MUST use 'deep_research'.",
+            "6. A true AGI delegates. Use your tools immediately.",
             "",
-            "GUIDELINES:",
-            "- Be helpful, direct, and proactive. Anticipate what the user might need.",
-            "- When you learn something important about the user, save it to memory.",
-            "- If a task is complex, consider using deep_research for thorough investigation.",
-            "- Use tools freely — you can search, compute, create files, run code, etc.",
-            "- If the user asks you to do something recurring, set up a scheduled task.",
-            "- Be honest about what you don't know. Search the web when unsure.",
-            "- Keep responses conversational unless the user wants detailed output.",
+            "CAPABILITIES:",
+            "- Launch deep multi-agent research investigations (deep_research)",
+            "- Dynamically delegate individual tasks to specialized sub-agents (delegate_task)",
+            "- Set reminders and scheduled tasks (cron jobs)",
+            "- Remember things across conversations using long-term memory",
         ]
 
         if memory_context:
@@ -531,9 +526,30 @@ class ChatHandler:
                 await self._push_callback(session.session_id, session.channel, f"❓ **Agent needs input**: {question}")
             
             q = self._steering_queues.setdefault(session.session_id, asyncio.Queue())
-            # Wait indefinitely for the user to reply via 'steer' packet
             answer = await q.get()
             return f"User replied: {answer}"
+
+        async def handle_delegate_task(specialty: str, task: str, **kw) -> str:
+            # Dynamically instantiate a specialist and map it to the Roster HUB natively!
+            from .agent import create_specialist_agent
+            from cmas.cli import get_project_dir
+            proj_dir = get_project_dir(task[:20])
+            agent = create_specialist_agent(
+                f"Specialist_{specialty.replace(' ', '_')}", 
+                specialty, 
+                hub=self.gateway.hub if hasattr(self, 'gateway') else None,
+                workspace=proj_dir, 
+                model=self.model,
+                gateway=self.gateway if hasattr(self, 'gateway') else None,
+                memory=self.memory
+            )
+            
+            # Spin up the agent in the background so it shows on the UI without blocking
+            from .state import Task as AgentTask
+            agt_task = AgentTask(id=f"delegated_{int(time.time())}", description=task)
+            result = await agent.execute(agt_task)
+            
+            return f"Delegation to {specialty} completed. Findings:\n{result}"
 
         handlers["create_reminder"] = handle_create_reminder
         handlers["create_scheduled_task"] = handle_create_scheduled_task
@@ -546,6 +562,7 @@ class ChatHandler:
         handlers["find_sessions"] = handle_find_sessions
         handlers["switch_session"] = handle_switch_session
         handlers["ask_user"] = handle_ask_user
+        handlers["delegate_task"] = handle_delegate_task
 
         return handlers
 
