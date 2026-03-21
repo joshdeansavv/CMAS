@@ -1,0 +1,15 @@
+# Core
+openai>=1.0
+aiohttp>=3.9
+python-dotenv>=1.0
+pyyaml>=6.0
+
+# Memory & Search
+chromadb>=0.4
+
+# Scheduling
+croniter>=1.3
+
+# Optional channels (installed by setup.sh if needed)
+# discord.py>=2.3
+# twilio>=8.0

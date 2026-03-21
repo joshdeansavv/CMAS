@@ -1,0 +1,22 @@
+Summary of Cancer Types, Causes, and Recent Advances (2024)
+
+Types of Cancer Based on Tissue Origin:
+1. Carcinomas (epithelial origin, 80-90% of cases)
+2. Sarcomas (connective tissues)
+3. Leukemias (blood-forming cells)
+4. Lymphomas (lymphatic tissues)
+5. Melanomas (melanocytes in skin)
+
+Known Causes:
+- Genetic mutations (oncogenes, tumor suppressors)
+- Environmental carcinogens (tobacco, radiation, chemicals)
+- Lifestyle factors (smoking, diet, obesity)
+- Infections (HPV, hepatitis viruses)
+- Chronic inflammation and hormones
+
+Recent Discoveries (2023-2024):
+- Targeting treatment-resistant prostate cancer
+- New role of SIRPA gene in melanoma
+- Impact of DNA unwinding from histones on cancer behavior
+
+These findings highlight cancer heterogeneity driven by tissue origin, genetics, environment, and biology, affecting diagnosis and treatment.

@@ -1,0 +1,13 @@
+Reliable sources for up-to-date cancer research data include:
+- Cancer Research Data Commons (https://datacommons.cancer.gov/explore/datasets)
+- CDC's Cancer Data and Statistics (https://www.cdc.gov/cancer/data/index.html)
+- National Cancer Institute's Data Catalog (https://www.cancer.gov/about-nci/organization/cbiit/catalog)
+
+Tools and platforms for automated research data extraction and NLP include:
+- CLAMP
+- cTAKES
+- MetaMap
+- Covidence
+- John Snow Labs' Healthcare NLP
+
+These tools are widely used for extracting and analyzing biomedical concept entities.

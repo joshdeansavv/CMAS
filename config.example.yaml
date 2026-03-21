@@ -1,0 +1,44 @@
+# CMAS Configuration
+# Copy this to config.yaml and edit as needed.
+# All settings have sensible defaults — you only need to set what you want to change.
+# API keys can also be set in .env (recommended for secrets).
+
+server:
+  host: "0.0.0.0"          # bind address
+  port: 8080                # web UI port
+
+model:
+  default: "gpt-4.1-nano"   # main chat model
+  research: "gpt-4.1-mini"  # model for deep research tasks
+  temperature: 0.7
+
+# Your local timezone (IANA format). Used for reminders and report dates.
+# Examples: America/New_York, Europe/London, Asia/Tokyo, US/Pacific
+# Can also be set via CMAS_TIMEZONE env var.
+# timezone: "America/New_York"
+
+channels:
+  web:
+    enabled: true            # built-in web chat UI (always recommended)
+
+  discord:
+    enabled: false
+    token: ""                # or set DISCORD_TOKEN in .env
+
+  whatsapp:
+    enabled: false
+    twilio_sid: ""           # or set in .env
+    twilio_token: ""
+    phone: ""                # your Twilio WhatsApp number
+
+memory:
+  vector_db_path: "./data/vectors"   # ChromaDB storage
+  sqlite_path: "./data/cmas.db"      # conversation + knowledge storage
+  max_context_messages: 50           # messages kept in active context
+
+scheduler:
+  enabled: true              # background reminders, cron, proactive behavior
+  proactive_interval: 300    # seconds between proactive checks (5 min)
+
+workspace:
+  base_dir: "./workspace"    # where the agent saves files, projects, etc.
