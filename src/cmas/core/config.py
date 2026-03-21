@@ -41,8 +41,8 @@ DEFAULTS = {
         },
     },
     "memory": {
-        "vector_db_path": str(BASE_DIR / "data" / "vectors"),
-        "sqlite_path": str(BASE_DIR / "data" / "cmas.db"),
+        "vector_db_path": str(BASE_DIR / ".c2_mission_data" / "vectors"),
+        "sqlite_path": str(BASE_DIR / ".c2_mission_data" / "hub.db"),
         "max_context_messages": 50,
     },
     "scheduler": {
@@ -50,7 +50,7 @@ DEFAULTS = {
         "proactive_interval": 300,
     },
     "workspace": {
-        "base_dir": str(BASE_DIR / "workspace"),
+        "base_dir": str(BASE_DIR / ".c2_mission_workspace"),
     },
 }
 

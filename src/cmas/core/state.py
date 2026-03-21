@@ -25,6 +25,7 @@ class Task:
     description: str
     assigned_to: str = ""
     status: TaskStatus = TaskStatus.PENDING
+    project_id: str = ""
     result: str = ""
     parent_task_id: str = ""
     created_at: float = field(default_factory=time.time)
@@ -45,6 +46,7 @@ class Hub:
         self.db_path = self.project_dir / "hub.db"
         self._local = threading.local()
         self.on_status_change = None
+        self.on_message = None
         self._init_db()
 
     def _get_conn(self) -> sqlite3.Connection:
@@ -56,11 +58,19 @@ class Hub:
     def _init_db(self):
         conn = self._get_conn()
         conn.executescript("""
+            CREATE TABLE IF NOT EXISTS projects (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                focus TEXT DEFAULT '',
+                status TEXT DEFAULT 'active',
+                created_at REAL
+            );
             CREATE TABLE IF NOT EXISTS tasks (
                 id TEXT PRIMARY KEY,
                 description TEXT,
                 assigned_to TEXT DEFAULT '',
                 status TEXT DEFAULT 'pending',
+                project_id TEXT DEFAULT '',
                 result TEXT DEFAULT '',
                 parent_task_id TEXT DEFAULT '',
                 created_at REAL,
@@ -101,6 +111,7 @@ class Hub:
             CREATE TABLE IF NOT EXISTS sessions (
                 session_id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
+                project_id TEXT DEFAULT '',
                 channel TEXT NOT NULL DEFAULT 'web',
                 created_at REAL,
                 last_active REAL,
@@ -129,9 +140,9 @@ class Hub:
     def add_task(self, task: Task):
         conn = self._get_conn()
         conn.execute(
-            "INSERT OR REPLACE INTO tasks VALUES (?,?,?,?,?,?,?,?)",
+            "INSERT OR REPLACE INTO tasks VALUES (?,?,?,?,?,?,?,?,?)",
             (task.id, task.description, task.assigned_to, task.status.value,
-             task.result, task.parent_task_id, task.created_at, task.updated_at),
+             task.project_id, task.result, task.parent_task_id, task.created_at, task.updated_at),
         )
         conn.commit()
 
@@ -176,6 +187,8 @@ class Hub:
             (sender, recipient, content, time.time()),
         )
         conn.commit()
+        if self.on_message:
+            self.on_message(sender, recipient, content)
 
     def get_messages(self, recipient: str, since: float = 0) -> List[Dict]:
         conn = self._get_conn()
@@ -231,6 +244,28 @@ class Hub:
         conn = self._get_conn()
         rows = conn.execute("SELECT * FROM agent_status ORDER BY name").fetchall()
         return [dict(r) for r in rows]
+
+    # ── Projects ─────────────────────────────────────────────────
+    def create_project(self, name: str, focus: str = "") -> str:
+        import uuid
+        pid = f"proj_{uuid.uuid4().hex[:6]}"
+        conn = self._get_conn()
+        conn.execute(
+            "INSERT INTO projects (id, name, focus, created_at) VALUES (?,?,?,?)",
+            (pid, name, focus, time.time())
+        )
+        conn.commit()
+        return pid
+
+    def get_projects(self) -> List[Dict]:
+        conn = self._get_conn()
+        rows = conn.execute("SELECT * FROM projects ORDER BY created_at DESC").fetchall()
+        return [dict(r) for r in rows]
+
+    def get_project_tasks(self, project_id: str) -> List[Task]:
+        conn = self._get_conn()
+        rows = conn.execute("SELECT * FROM tasks WHERE project_id = ?", (project_id,)).fetchall()
+        return [Task(**{k: r[k] for k in r.keys()}) for r in rows]
 
     # ── Summary ──────────────────────────────────────────────────
 

@@ -6,18 +6,18 @@ dist/
 build/
 .eggs/
 
-# Environment
+# Runtime Mission Data (Hidden & Secure)
+.c2_mission_data/
+.c2_mission_workspace/
 .env
 .venv/
 venv/
 env/
 
-# Runtime data
+# Legacy Data (Cleanup)
 data/
 workspace/
 *.db
-
-# Generated project output
 project_*/
 
 # IDE

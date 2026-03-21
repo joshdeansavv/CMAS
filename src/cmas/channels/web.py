@@ -25,15 +25,19 @@ class WebChannel:
             self.gateway.hub.on_status_change = self._broadcast_status
 
     def _broadcast_audit(self, entry):
-        payload = {
-            "type": "telemetry",
-            "agent": entry.agent,
-            "action": entry.action,
-            "tool": entry.tool,
-            "args": entry.args_summary,
-            "allowed": entry.allowed,
-            "duration": getattr(entry, "duration_ms", 0.0)
-        }
+        if isinstance(entry, dict):
+            payload = entry
+            if "type" not in payload: payload["type"] = "telemetry"
+        else:
+            payload = {
+                "type": "telemetry",
+                "agent": getattr(entry, "agent", "gateway"),
+                "action": getattr(entry, "action", "audit"),
+                "tool": getattr(entry, "tool", "internal"),
+                "args": getattr(entry, "args_summary", ""),
+                "allowed": getattr(entry, "allowed", True),
+                "duration": getattr(entry, "duration_ms", 0.0)
+            }
         asyncio.create_task(self.push_to_all_json(payload))
         
     def _broadcast_status(self, name: str, status: str, task: str):
@@ -188,6 +192,18 @@ class WebChannel:
             self.connections.pop(session_id, None)
 
         return ws
+
+    async def C2_TERMINATE_ALL_CONNECTIONS(self):
+        """Close all active WebSocket connections for a clean shutdown."""
+        print(f"[C2 Hub Web] Definitive Shutdown Sequence Engaged in {__file__}")
+        import aiohttp
+        tasks = []
+        for sid, ws in list(self.connections.items()):
+            if not ws.closed:
+                tasks.append(ws.close(code=aiohttp.WSCloseCode.GOING_AWAY, message='Server shutdown'))
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self.connections.clear()
 
     async def push_to_session(self, session_id: str, text: str):
         """Push a proactive message to a connected web session."""

@@ -214,6 +214,8 @@ COGNITIVE GUIDELINES:
 
         # ── Phase 1: REASON ──────────────────────────────────────
         reasoning_context = await self._reason_about_task(task.description)
+        if self.gateway:
+            self.gateway.log_trace(self.name, task.id, reasoning_context, "reasoning")
 
         # Check for messages from other agents
         messages_from_others = self.hub.get_messages(self.name)
@@ -238,6 +240,7 @@ COGNITIVE GUIDELINES:
         async def on_tool_call(tool_name, args, result_preview):
             if self.gateway:
                 await self.gateway.check_interrupt(task.id, self.name)
+                self.gateway.log_trace(self.name, task.id, f"Calling tool: {tool_name}({str(args)[:50]}...)", "tool_call")
             self._log(f"  tool: {tool_name}({str(args)[:60]}...)")
 
         try:

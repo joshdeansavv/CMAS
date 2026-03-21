@@ -44,6 +44,9 @@ class CMASServer:
 
         # Channels (Strictly localhost web interface for now)
         self.web_channel = WebChannel(self.gateway)
+        print(f"[C2 Hub Debug] WebChannel instance type: {type(self.web_channel)}")
+        import inspect
+        print(f"[C2 Hub Debug] Source file for WebChannel: {inspect.getfile(WebChannel)}")
         self.channels = {"web": self.web_channel}
 
         # Set up push callback for proactive messages
@@ -83,8 +86,11 @@ class CMASServer:
             # Also serve root static files if any (like favicon)
             app.router.add_static("/", str(WEB_DIR), name="static", show_index=False)
 
-        # Health check
+        # APIs
         app.router.add_get("/health", self._health_handler)
+        app.router.add_get("/api/workspace", self._workspace_handler)
+        app.router.add_get("/api/workspace/file", self._file_handler)
+        app.router.add_get("/api/projects", self._projects_handler)
 
         # External channels explicitly disabled to isolate localhost gateway
         return app
@@ -100,6 +106,38 @@ class CMASServer:
         health = self.gateway.health_check()
         health["sessions"] = len(self.web_channel.connections)
         return web.json_response(health)
+
+    async def _workspace_handler(self, request: web.Request) -> web.Response:
+        """Browse the current mission workspace."""
+        path = self.config.workspace_path
+        def _get_tree(p):
+            res = []
+            if not p.exists(): return res
+            for child in p.iterdir():
+                if child.name.startswith("."): continue
+                node = {"name": child.name, "path": str(child), "type": "directory" if child.is_dir() else "file"}
+                if child.is_dir():
+                    node["children"] = _get_tree(child)
+                res.append(node)
+            return sorted(res, key=lambda x: (x["type"] == "file", x["name"]))
+        tree = _get_tree(path)
+        return web.json_response(tree)
+
+    async def _file_handler(self, request: web.Request) -> web.Response:
+        """Read a file from the workspace."""
+        file_path = request.query.get("path")
+        if not file_path: return web.Response(status=400)
+        p = Path(file_path)
+        if not p.exists() or p.is_dir(): return web.Response(status=404)
+        try:
+            return web.json_response({"content": p.read_text()})
+        except Exception:
+            return web.Response(status=500, text="Unable to read file")
+
+    async def _projects_handler(self, request: web.Request) -> web.Response:
+        """List active C2 mission projects."""
+        projects = self.hub.get_projects()
+        return web.json_response(projects)
 
     # External platforms like Discord disconnected by C2 architectural mandate
 
@@ -137,7 +175,8 @@ class CMASServer:
 
     async def start(self):
         """Start the full CMAS server."""
-        print(f"\n  CMAS — Always-On Agent")
+        print(f"\n  >>> C2 MISSION CONTROL VERIFIED BOOT [Revision 42] <<<")
+        print(f"  CMAS — Always-On Agent")
         print(f"  {'─'*40}")
         print(f"  Model: {self.config.model}")
         if self.config.timezone:
@@ -174,6 +213,10 @@ class CMASServer:
             print("\n[Mission Control] Safety Shutdown engaged... cleaning up Gateway C2 loops.")
             for task in self._background_tasks:
                 task.cancel()
-            if hasattr(self, 'web_channel'):
-                await self.web_channel.close_all()
+            if hasattr(self, 'web_channel') and hasattr(self.web_channel, 'C2_TERMINATE_ALL_CONNECTIONS'):
+                print("[C2 Server Hub] Calling C2_TERMINATE_ALL_CONNECTIONS hook...")
+                await self.web_channel.C2_TERMINATE_ALL_CONNECTIONS()
+            else:
+                method = "C2_TERMINATE_ALL_CONNECTIONS"
+                print(f"[C2 Hub Error] web_channel has no {method} method! It is still loading an old cache.")
             await runner.cleanup()

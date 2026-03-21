@@ -55,6 +55,8 @@ class AuditEntry:
     args_summary: str
     result_summary: str
     allowed: bool
+    task_id: str = ""
+    reasoning: str = ""
     duration_ms: float = 0.0
 
 
@@ -98,8 +100,25 @@ class Gateway:
         # Mission Control C2 Hooks
         self._task_pause_events: Dict[str, asyncio.Event] = {}
         self._task_stop_events: Dict[str, asyncio.Event] = {}
+        self._agent_traces: Dict[str, List[Dict]] = defaultdict(list)
+        self.hub.on_message = self._on_hub_message
 
-        self._print("Gateway initialized")
+        self._print("Gateway Mission Control active")
+
+    def _on_hub_message(self, sender, recipient, content):
+        """Broadcast inter-agent communication for visualization."""
+        self.broadcast_telemetry({
+            "type": "comm",
+            "ts": time.strftime("%H:%M:%S"),
+            "from": sender,
+            "to": recipient,
+            "text": content[:200]
+        })
+
+    def broadcast_telemetry(self, payload: dict):
+        """Broadcast a real-time event to the C2 Cockpit."""
+        if self.on_audit_event:
+            self.on_audit_event(payload)
 
     def _print(self, msg: str):
         print(f"[Gateway] {msg}")
@@ -198,7 +217,8 @@ class Gateway:
     # ── Audit Log ────────────────────────────────────────────────
 
     def _audit(self, agent: str, action: str, tool: str, args_summary: str,
-               result_summary: str, allowed: bool, duration_ms: float = 0.0):
+               result_summary: str, allowed: bool, duration_ms: float = 0.0,
+               task_id: str = "", reasoning: str = ""):
         entry = AuditEntry(
             timestamp=time.time(),
             agent=agent,
@@ -208,24 +228,54 @@ class Gateway:
             result_summary=result_summary[:200],
             allowed=allowed,
             duration_ms=duration_ms,
+            task_id=task_id,
+            reasoning=reasoning
         )
         self._audit_log.append(entry)
 
         if self.on_audit_event:
             try:
-                self.on_audit_event(entry)
+                payload = {
+                    "type": "telemetry",
+                    "ts": time.strftime("%H:%M:%S"),
+                    "agent": getattr(entry, "agent", "gateway"),
+                    "action": getattr(entry, "action", "audit"),
+                    "tool": getattr(entry, "tool", "internal"),
+                    "args": getattr(entry, "args_summary", ""),
+                    "result": getattr(entry, "result_summary", ""),
+                    "allowed": getattr(entry, "allowed", True),
+                    "task_id": getattr(entry, "task_id", ""),
+                    "reasoning": getattr(entry, "reasoning", "")
+                }
+                self.on_audit_event(payload)
             except Exception:
                 pass
 
         # Also persist to hub
         self.hub.send_message(
             sender="gateway",
-            recipient="audit",
-            content=json.dumps({
-                "agent": agent, "tool": tool, "action": action,
-                "allowed": allowed, "duration_ms": round(duration_ms, 1),
-            }),
+            recipient="AuditLog",
+            content=f"[{entry.agent}] {entry.tool}({entry.args_summary}) -> {entry.result_summary}"
         )
+
+    def log_trace(self, agent_name: str, task_id: str, content: str, step_type: str = "reasoning"):
+        """Log a specific decision trace for the C2 Cockpit HUD."""
+        entry = {
+            "ts": time.time(),
+            "type": step_type,
+            "content": content
+        }
+        self._agent_traces[agent_name].append(entry)
+        
+        if self.on_audit_event:
+            self.on_audit_event({
+                "type": "trace",
+                "agent": agent_name,
+                "task_id": task_id,
+                "step_type": step_type,
+                "content": content,
+                "ts": time.strftime("%H:%M:%S")
+            })
 
     def get_audit_log(self, agent: Optional[str] = None, limit: int = 50) -> List[AuditEntry]:
         """Get recent audit entries, optionally filtered by agent."""
