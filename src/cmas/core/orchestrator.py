@@ -128,6 +128,72 @@ class Orchestrator:
             sys.exit(0)
         return response
 
+    # ── Phase -1: PRE-SCREENING (The Architect) ──────────────────
+
+    async def _prescreen_goal(self, goal: str) -> str:
+        """Analyze physical/digital blockers, missing tools, and required schemas before executing."""
+        self._print("PRE-SCREENING goal for constraints and required toolsets (OpenClaw style)...")
+
+        response = await chat(
+            messages=[
+                {"role": "system", "content": f"""You are the Pre-Screening Architect for an AGI system.
+Analyze this goal for:
+1. Missing Python Packages needed (e.g. `biopython`, `numpy`, `chromadb`)
+2. Missing local databases or datasets that must be created first
+3. Foundational scientific/biological constraints that make this goal impossible as stated
+
+If specialized Python packages or databases are needed, you MUST demand a Developer agent to build them first.
+Return JSON ONLY:
+{{
+  "is_feasible": true/false,
+  "missing_dependencies": ["package1", "package2"],
+  "developer_tasks_needed": ["Write a script to seed a local SQLite db with molecules", "pip install biopython"],
+  "scientific_constraints": ["Constraint 1"]
+}}"""},
+                {"role": "user", "content": goal},
+            ],
+            model=self.model,
+            temperature=0.2,
+        )
+
+        try:
+            text = response.content.strip()
+            if text.startswith("```"):
+                text = text.split("\n", 1)[1]
+                text = text.rsplit("```", 1)[0]
+            screen = json.loads(text)
+        except Exception as e:
+            self._print(f"Pre-screen parse failed: {e}")
+            return goal
+
+        # If developer tasks are needed, inject them immediately into the Hub!
+        dev_tasks = screen.get("developer_tasks_needed", [])
+        deps = screen.get("missing_dependencies", [])
+        
+        if deps:
+            self._print(f"  Missing Dependencies detected: {', '.join(deps)}")
+            # Auto-install missing packages using a shell agent
+            task_id = "prescreen_pip"
+            task_desc = f"Ensure the following Python packages are installed via pip: {', '.join(deps)}"
+            t = Task(id=task_id, description=task_desc, status=TaskStatus.PENDING)
+            self.hub.add_task(t)
+            self._task_agent_map[task_id] = "specialist:Developer"
+            self._task_deps[task_id] = []
+            
+        for i, dt in enumerate(dev_tasks):
+            self._print(f"  Architect injecting prerequisite task: {dt}")
+            task_id = f"prescreen_dev_{i}"
+            t = Task(id=task_id, description=f"PRE-REQUISITE: {dt}", status=TaskStatus.PENDING)
+            self.hub.add_task(t)
+            self._task_agent_map[task_id] = "specialist:Developer"
+            self._task_deps[task_id] = ["prescreen_pip"] if deps else []
+
+        # Return an augmented goal string with the identified constraints
+        constraints = screen.get("scientific_constraints", [])
+        constraint_text = ("\n\nKNOWN CONSTRAINTS TO CONSIDER:\n" + "\n".join(f"- {c}" for c in constraints)) if constraints else ""
+        
+        return goal + constraint_text
+
     # ── Phase 0: PERCEIVE — understand goal + context ────────────
 
     async def _perceive(self, goal: str) -> Dict:
@@ -266,8 +332,16 @@ Return ONLY the JSON array."""},
             tasks.append(task)
             self._print(f"  Task: [{td['id']}] {td['description'][:80]}...")
 
-        self._task_agent_map = {td["id"]: td.get("agent_type", "research") for td in tasks_data}
-        self._task_deps = {td["id"]: td.get("depends_on", []) for td in tasks_data}
+        self._task_agent_map.update({td["id"]: td.get("agent_type", "research") for td in tasks_data})
+        self._task_deps.update({td["id"]: td.get("depends_on", []) for td in tasks_data})
+
+        # Make the first conceptual tasks depend on the pre-screening dev tasks if any exist
+        existing_dev_tasks = [t.id for t in self.hub.get_all_tasks() if t.id.startswith('prescreen_dev_')]
+        if existing_dev_tasks:
+            for td in tasks_data:
+                # If a task has no dependencies, force it to wait for the infra to finish building
+                if not self._task_deps[td["id"]]:
+                    self._task_deps[td["id"]] = existing_dev_tasks
 
         self.hub.remember("goal", goal)
         self.hub.remember("task_plan", json.dumps(tasks_data, indent=2))
@@ -597,12 +671,19 @@ IMPORTANT RULES:
         self._print(f"{'='*60}")
         self._print(f"GOAL: {goal}")
         self._print(f"{'='*60}\n")
+        
+        # Ensure task maps are initialized before we start modifying them in pre-screen
+        self._task_agent_map = {}
+        self._task_deps = {}
+
+        # Phase -1: PRE-SCREENING
+        augmented_goal = await self._prescreen_goal(goal)
 
         # Phase 0: PERCEIVE
-        perception = await self._perceive(goal)
+        perception = await self._perceive(augmented_goal)
 
         # Phase 1: PLAN
-        tasks = await self.decompose_goal(goal, perception)
+        tasks = await self.decompose_goal(augmented_goal, perception)
 
         # Phases 2-5: Execute -> Evaluate -> Reflect -> Iterate
         for iteration in range(1, self.max_iterations + 1):

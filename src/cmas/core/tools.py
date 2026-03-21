@@ -201,7 +201,7 @@ TOOL_DEFS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "recipient": {"type": "string", "description": "Name of the recipient agent (e.g. 'ResearchAgent', 'orchestrator')"},
+                    "recipient": {"type": "string", "description": "Name of the recipient agent (e.g. 'ResearchAgent', 'orchestrator'), or 'SwarmChannel' to broadcast a blocker so idle specialists can help you."},
                     "content": {"type": "string", "description": "Message content"},
                 },
                 "required": ["recipient", "content"],
@@ -211,8 +211,23 @@ TOOL_DEFS = [
     {
         "type": "function",
         "function": {
+            "name": "run_command",
+            "description": "Run secure shell commands natively. Use this to `pip install` required science packages, stand up local databases, spin up Docker containers, or orchestrate files before running python scripts.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "The bash/shell command to execute (e.g., 'pip install numpy' or 'mkdir data')"},
+                    "timeout": {"type": "integer", "description": "Optional timeout in seconds (default 30)"},
+                },
+                "required": ["command"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "delegate_task",
-            "description": "Dynamically spawn a specialized sub-agent to handle a complex task outside your immediate scope. You will wait for its result.",
+            "description": "Dynamically spawn a specialized sub-agent to handle a complex task. This is NON-BLOCKING; it will spawn the agent in the background (Swarm style) and immediately return control to you so you can spawn more agents or continue thinking.",
             "parameters": {
                 "type": "object",
                 "properties": {

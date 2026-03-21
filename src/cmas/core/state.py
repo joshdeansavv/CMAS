@@ -180,7 +180,7 @@ class Hub:
     def get_messages(self, recipient: str, since: float = 0) -> List[Dict]:
         conn = self._get_conn()
         rows = conn.execute(
-            "SELECT * FROM messages WHERE recipient = ? AND timestamp > ? ORDER BY timestamp",
+            "SELECT * FROM messages WHERE (recipient = ? OR recipient = 'SwarmChannel') AND timestamp > ? ORDER BY timestamp",
             (recipient, since),
         ).fetchall()
         return [dict(r) for r in rows]

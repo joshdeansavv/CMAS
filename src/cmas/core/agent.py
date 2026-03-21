@@ -33,6 +33,7 @@ class Agent:
         model: str = "gpt-4.1-nano",
         gateway: Any = None,
         memory: Optional[Memory] = None,
+        depth: int = 0,
     ):
         self.name = name
         self.role = role
@@ -42,6 +43,7 @@ class Agent:
         self.model = model
         self.gateway = gateway
         self.memory = memory
+        self.depth = depth
         self.reasoner = Reasoner(model=model)
         self._log_lines: List[str] = []
 
@@ -138,7 +140,8 @@ COGNITIVE GUIDELINES:
 - Investigate the unknowns identified in the reasoning.
 - Use web_search to find real information. Don't make things up.
 - If your initial approach isn't working, ADAPT — try a different angle.
-- You can dynamically **delegate sub-tasks** to specialized agents using the `delegate_task` tool. If a task requires advanced expertise outside your core role, SPUR a specialist!
+- You can dynamically **delegate sub-tasks** to specialized agents using the `delegate_task` tool. This spawns them in the background so you can keep working or spawn more!
+- If you run into a blocker, broadcast a message to the "SwarmChannel" (using send_message) to ask if any other agent can help you (e.g. asking for a Python package or database built).
 - Save important findings to files in your workspace using write_file.
 - Be specific and concrete. Cite sources when possible.
 - When done, provide: (1) key findings, (2) confidence level, (3) what remains unknown.
@@ -163,17 +166,21 @@ COGNITIVE GUIDELINES:
         handlers["write_file"] = handle_write_file
 
         async def handle_delegate_task(specialty: str, task: str) -> str:
+            if self.depth >= 5:
+                return "Error: Maximum Swarm recursion depth (5) reached. You must resolve this task yourself without delegating further."
+                
             from .agent import create_specialist_agent
             import uuid
             
             # Create a safe name for the sub-agent
             safe_domain = specialty.replace(' ', '_').replace('-', '_')[:20]
-            name = f"Specialist_{safe_domain}"
+            name = f"Specialist_{safe_domain}_{uuid.uuid4().hex[:4]}"
             
             sub_agent = create_specialist_agent(
                 name=name, specialty=specialty,
                 hub=self.hub, workspace=self.workspace.parent / name.lower(),
-                model=self.model, gateway=self.gateway, memory=self.memory
+                model=self.model, gateway=self.gateway, memory=self.memory,
+                depth=self.depth + 1
             )
             
             if self.gateway:
@@ -181,12 +188,15 @@ COGNITIVE GUIDELINES:
                 
             task_id = f"del_{uuid.uuid4().hex[:6]}"
             from .state import Task
-            t = Task(id=task_id, description=f"[Delegated from {self.name}] {task}")
+            t = Task(id=task_id, description=f"[Delegated from {self.name}] {task}. When complete, summarize and send_message back to {self.name}.")
             self.hub.add_task(t)
             
-            self._log(f"Delegating sub-task '{task_id}' to {name}...")
-            result = await sub_agent.execute(t)
-            return f"Result from {name} on {task_id}:\n{result}"
+            self._log(f"Spawning background sub-agent '{name}' for task '{task_id}'...")
+            
+            # Non-blocking Swarm execution
+            asyncio.create_task(sub_agent.execute(t))
+            
+            return f"Success. Sub-agent '{name}' spawned in the background for: {task}. They will send_message to '{self.name}' when complete. You may continue working or spawn additional parallel agents."
 
         handlers["delegate_task"] = handle_delegate_task
         return handlers
@@ -295,7 +305,7 @@ COGNITIVE GUIDELINES:
 # ── Specialized Agent Factories ──────────────────────────────────────
 
 def create_research_agent(hub: Hub, workspace: Path, model: str = "gpt-4.1-nano",
-                          gateway: Any = None, memory: Optional[Memory] = None) -> Agent:
+                          gateway: Any = None, memory: Optional[Memory] = None, depth: int=0) -> Agent:
     return Agent(
         name="ResearchAgent",
         role=(
@@ -305,12 +315,12 @@ def create_research_agent(hub: Hub, workspace: Path, model: str = "gpt-4.1-nano"
             "Always cite your sources with URLs."
         ),
         hub=hub, workspace=workspace / "research", model=model,
-        gateway=gateway, memory=memory,
+        gateway=gateway, memory=memory, depth=depth,
     )
 
 
 def create_analyst_agent(hub: Hub, workspace: Path, model: str = "gpt-4.1-nano",
-                         gateway: Any = None, memory: Optional[Memory] = None) -> Agent:
+                         gateway: Any = None, memory: Optional[Memory] = None, depth: int=0) -> Agent:
     return Agent(
         name="AnalystAgent",
         role=(
@@ -320,12 +330,12 @@ def create_analyst_agent(hub: Hub, workspace: Path, model: str = "gpt-4.1-nano",
             "Be rigorous and evidence-based."
         ),
         hub=hub, workspace=workspace / "analysis", model=model,
-        gateway=gateway, memory=memory,
+        gateway=gateway, memory=memory, depth=depth,
     )
 
 
 def create_writer_agent(hub: Hub, workspace: Path, model: str = "gpt-4.1-nano",
-                        gateway: Any = None, memory: Optional[Memory] = None) -> Agent:
+                        gateway: Any = None, memory: Optional[Memory] = None, depth: int=0) -> Agent:
     return Agent(
         name="WriterAgent",
         role=(
@@ -335,18 +345,18 @@ def create_writer_agent(hub: Hub, workspace: Path, model: str = "gpt-4.1-nano",
             "to your workspace."
         ),
         hub=hub, workspace=workspace / "reports", model=model,
-        gateway=gateway, memory=memory,
+        gateway=gateway, memory=memory, depth=depth,
     )
 
 
 def create_specialist_agent(
     name: str, specialty: str, hub: Hub, workspace: Path,
     model: str = "gpt-4.1-nano", gateway: Any = None,
-    memory: Optional[Memory] = None,
+    memory: Optional[Memory] = None, depth: int = 0,
 ) -> Agent:
     return Agent(
         name=name,
         role=f"You are a specialist in: {specialty}. Apply your expertise to the given task.",
         hub=hub, workspace=workspace / name.lower(), model=model,
-        gateway=gateway, memory=memory,
+        gateway=gateway, memory=memory, depth=depth,
     )
