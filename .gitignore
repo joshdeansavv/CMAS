@@ -9,20 +9,11 @@ __pycache__/
 .Python
 env/
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
 .eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
+.venv/
+venv/
 
 # Runtime Mission Data (PRIVATE / DO NOT COMMIT)
 # ──────────────────────────────────────────────────────────────────────
@@ -37,32 +28,31 @@ reports/
 *.json
 project_*/
 .env
-.clauderoot
-.cursorrules
-
-# Config (PRIVATE / DO NOT COMMIT)
-# ──────────────────────────────────────────────────────────────────────
 config.yaml
 personality.yaml
 agents_config.json
 
-# IDE / AI Agent Dotfiles (PRIVATE / DO NOT COMMIT)
+# IDE / AI Agent Dotfolders (PRIVATE / DO NOT COMMIT)
 # ──────────────────────────────────────────────────────────────────────
-.*
-!/.gitignore
-!/.env.example
-!/.github/
-!/src/
-!/setup.sh
-!/start.sh
-!/README.md
-!/LICENSE
-!/config.example.yaml
-!/configs/
-!/main.py
-!/requirements.txt
+.claude/
+.cursor/
+.agent/
+.kiro/
+.roo/
+.trae/
+.windsurf/
+.codebuddy/
+.codex/
+.continue/
+.gemini/
+.opencode/
+.qoder/
+.kiro/
+.trae/
+.windsurf/
+.vscode/
+.idea/
 
 # OS Files
 .DS_Store
 Thumbs.db
-desktop.ini
