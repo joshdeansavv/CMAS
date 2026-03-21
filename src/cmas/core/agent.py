@@ -151,6 +151,17 @@ COGNITIVE GUIDELINES:
             from .tools import TOOL_HANDLERS
             handlers = dict(TOOL_HANDLERS)
 
+        async def handle_write_file(path: str, content: str) -> str:
+            # Force strictly to workspace to prevent "gunk"
+            safe_name = Path(path).name
+            full_path = str(self.workspace / safe_name)
+            if self.gateway:
+                return await self.gateway.invoke_tool(self.name, "write_file", {"path": full_path, "content": content})
+            from .tools import write_file
+            return await write_file(full_path, content)
+            
+        handlers["write_file"] = handle_write_file
+
         async def handle_delegate_task(specialty: str, task: str) -> str:
             from .agent import create_specialist_agent
             import uuid

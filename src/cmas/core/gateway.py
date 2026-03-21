@@ -77,7 +77,7 @@ class Gateway:
         permissions: Optional[Dict[str, set]] = None,
         rate_limit_calls: int = 30,
         rate_limit_window: float = 60.0,
-        max_recursion_depth: int = 10,
+        max_recursion_depth: int = 5,
     ):
         self.hub = hub
         self.project_dir = project_dir

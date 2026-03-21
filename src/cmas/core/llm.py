@@ -26,7 +26,9 @@ FALLBACK_CHAINS = {
 def get_client():
     global _client
     if _client is None:
-        _client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        from .config import Config
+        cfg = Config()
+        _client = AsyncOpenAI(api_key=cfg.openai_key, base_url=cfg.base_url)
     return _client
 
 
@@ -94,7 +96,7 @@ async def chat_with_tools(
     tool_defs: List[Dict],
     tool_handlers: Dict,
     model: str = "gpt-4.1-nano",
-    max_rounds: int = 10,
+    max_rounds: int = 4,
     on_tool_call: Optional[object] = None,
 ) -> str:
     """Run a tool-use loop until the model produces a final text response.

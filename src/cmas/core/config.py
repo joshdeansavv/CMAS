@@ -27,6 +27,7 @@ DEFAULTS = {
         "default": "gpt-4.1-nano",
         "research": "gpt-4.1-mini",
         "temperature": 0.7,
+        "base_url": None,
     },
     "timezone": None,
     "channels": {
@@ -89,6 +90,7 @@ class Config:
         self.model = self._data["model"]["default"]
         self.research_model = self._data["model"]["research"]
         self.temperature = self._data["model"]["temperature"]
+        self.base_url = os.getenv("OPENAI_BASE_URL", self._data["model"].get("base_url"))
 
         # Timezone
         self.timezone = os.getenv("CMAS_TIMEZONE") or self._data.get("timezone")
