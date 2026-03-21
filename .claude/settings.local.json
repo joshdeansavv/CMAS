@@ -18,7 +18,9 @@
       "Bash(launchctl load:*)",
       "Bash(launchctl list:*)",
       "Bash(launchctl unload:*)",
-      "Bash(/Users/joshua/Desktop/CMAS/MAIN_FOLDER/.venv/bin/python3 --version)"
+      "Bash(/Users/joshua/Desktop/CMAS/MAIN_FOLDER/.venv/bin/python3 --version)",
+      "Bash(npm run:*)",
+      "Bash(sqlite3:*)"
     ]
   }
 }

@@ -16,18 +16,27 @@ class WebChannel:
     def __init__(self, gateway):
         self.gateway = gateway
         self.connections: Dict[str, web.WebSocketResponse] = {}
+        # Map session_id → project_id so we can scope pushes
+        self._session_projects: Dict[str, str] = {}
 
         # Register telemetry broadcasts
-        if hasattr(self.gateway, 'on_audit_event'):
-            self.gateway.on_audit_event = self._broadcast_audit
+        self.gateway.on_audit_event = self._broadcast_audit
+        self.gateway.hub.on_status_change = self._broadcast_status
+        self.gateway.hub.on_task_change = self._broadcast_task_change
 
-        if hasattr(self.gateway.hub, 'on_status_change'):
-            self.gateway.hub.on_status_change = self._broadcast_status
+    def _safe_push(self, coro):
+        """Schedule a coroutine on the running event loop, safe from any calling context."""
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(coro)
+        except RuntimeError:
+            pass
 
     def _broadcast_audit(self, entry):
         if isinstance(entry, dict):
-            payload = entry
-            if "type" not in payload: payload["type"] = "telemetry"
+            payload = dict(entry)
+            if "type" not in payload:
+                payload["type"] = "telemetry"
         else:
             payload = {
                 "type": "telemetry",
@@ -36,18 +45,50 @@ class WebChannel:
                 "tool": getattr(entry, "tool", "internal"),
                 "args": getattr(entry, "args_summary", ""),
                 "allowed": getattr(entry, "allowed", True),
-                "duration": getattr(entry, "duration_ms", 0.0)
+                "duration": getattr(entry, "duration_ms", 0.0),
+                "task_id": getattr(entry, "task_id", ""),
             }
-        asyncio.create_task(self.push_to_all_json(payload))
-        
+
+        # Attach project_id if missing — look it up via task_id or agent name
+        if not payload.get("project_id"):
+            try:
+                task_id = payload.get("task_id", "")
+                if task_id:
+                    task = self.gateway.hub.get_task(task_id)
+                    if task:
+                        payload["project_id"] = task.project_id
+                if not payload.get("project_id"):
+                    agent_name = payload.get("agent", "")
+                    statuses = self.gateway.hub.get_agent_statuses()
+                    info = next((a for a in statuses if a["name"] == agent_name), {})
+                    payload["project_id"] = info.get("project_id", "")
+            except Exception:
+                pass
+
+        project_id = payload.get("project_id", "")
+        self._safe_push(self._push_to_project(payload, project_id))
+
+    def _broadcast_task_change(self, task_dict: dict):
+        payload = {"type": "task_update", "task": task_dict}
+        project_id = task_dict.get("project_id", "")
+        self._safe_push(self._push_to_project(payload, project_id))
+
     def _broadcast_status(self, name: str, status: str, task: str):
+        project_id = ""
+        try:
+            statuses = self.gateway.hub.get_agent_statuses()
+            info = next((a for a in statuses if a["name"] == name), {})
+            project_id = info.get("project_id", "")
+        except Exception:
+            pass
         payload = {
             "type": "agent_status",
             "agent": name,
             "status": status,
-            "task": task
+            "task": task,
+            "project_id": project_id,
         }
-        asyncio.create_task(self.push_to_all_json(payload))
+        self._safe_push(self._push_to_project(payload, project_id))
         
     async def push_to_all_json(self, payload: dict):
         for ws in list(self.connections.values()):
@@ -57,20 +98,37 @@ class WebChannel:
                 except Exception:
                     pass
 
+    async def _push_to_project(self, payload: dict, project_id: str):
+        """Push to all sessions belonging to a specific project.
+        If project_id is empty, broadcast to everyone (global events)."""
+        if not project_id:
+            await self.push_to_all_json(payload)
+            return
+        for sid, ws in list(self.connections.items()):
+            if not ws.closed and self._session_projects.get(sid) == project_id:
+                try:
+                    await ws.send_json(payload)
+                except Exception:
+                    pass
+
     async def websocket_handler(self, request: web.Request) -> web.WebSocketResponse:
         ws = web.WebSocketResponse()
         await ws.prepare(request)
 
-        session_id = request.query.get("session_id", str(uuid4()))
+        session_id = request.query.get("session_id", "") or str(uuid4())
         user_id = request.query.get("user_id", "web_user")
+        project_id = request.query.get("project_id", "")
         self.connections[session_id] = ws
+        self._session_projects[session_id] = project_id
 
         # Send session ID back so client can persist it
         await ws.send_json({"type": "session", "session_id": session_id})
 
-        # Send current roster on connect
+        # Send current roster on connect — filtered to this project only
         try:
             statuses = self.gateway.hub.get_agent_statuses()
+            if project_id:
+                statuses = [a for a in statuses if a.get("project_id") == project_id]
             await ws.send_json({"type": "roster_init", "agents": statuses})
         except Exception:
             pass
@@ -87,7 +145,21 @@ class WebChannel:
                     msg_type = data.get("type", "chat")
                     uid = data.get("user_id", user_id)
 
-                    if msg_type == "get_sessions":
+                    if msg_type == "get_tasks":
+                        try:
+                            proj_filter = data.get("project_id", project_id)
+                            all_tasks = self.gateway.hub.get_all_tasks()
+                            if proj_filter:
+                                all_tasks = [t for t in all_tasks if t.project_id == proj_filter]
+                            await ws.send_json({
+                                "type": "task_list",
+                                "tasks": [t.to_dict() for t in all_tasks]
+                            })
+                        except Exception as e:
+                            print(f"Error fetching tasks: {e}")
+                        continue
+
+                    elif msg_type == "get_sessions":
                         try:
                             # Fetch directly from backend DB bypassing LLM
                             sessions_db = self.gateway._chat_handler.sessions.list_sessions(user_id=uid, limit=30)
@@ -106,6 +178,16 @@ class WebChannel:
                             print(f"Error fetching history: {e}")
                         continue
                         
+                    elif msg_type == "create_project":
+                        name = data.get("name", "New Chat").strip() or "New Chat"
+                        focus = data.get("focus", "")
+                        try:
+                            pid = self.gateway.hub.create_project(name, focus)
+                            await ws.send_json({"type": "project_created", "id": pid, "name": name, "focus": focus})
+                        except Exception as e:
+                            await ws.send_json({"type": "error", "text": f"Failed to create project: {e}"})
+                        continue
+
                     elif msg_type == "set_project":
                         project = data.get("project", "").strip()
                         if project:
@@ -164,6 +246,54 @@ class WebChannel:
                             await ws.send_json({"type": "message", "text": f"*System: Mission Control issued TERMINATE for task {task_id}.*"})
                         continue
 
+                    elif msg_type == "stop_project":
+                        pid = data.get("project_id", project_id)
+                        if pid:
+                            try:
+                                all_tasks = self.gateway.hub.get_all_tasks()
+                                stopped = 0
+                                for t in all_tasks:
+                                    if t.project_id == pid and t.status.value in ("pending", "in_progress"):
+                                        try:
+                                            self.gateway.stop_task(t.id)
+                                            stopped += 1
+                                        except Exception:
+                                            pass
+                                self.gateway.hub.stop_project_tasks(pid)
+                                await ws.send_json({"type": "project_stopped", "project_id": pid, "stopped": stopped})
+                            except Exception as e:
+                                await ws.send_json({"type": "error", "text": f"Failed to stop project: {e}"})
+                        continue
+
+                    elif msg_type == "delete_project":
+                        pid = data.get("project_id", project_id)
+                        if pid:
+                            try:
+                                all_tasks = self.gateway.hub.get_all_tasks()
+                                for t in all_tasks:
+                                    if t.project_id == pid:
+                                        try:
+                                            self.gateway.stop_task(t.id)
+                                        except Exception:
+                                            pass
+                                self.gateway.hub.stop_project_tasks(pid)
+                                self.gateway.hub.delete_project(pid)
+                                await ws.send_json({"type": "project_deleted", "project_id": pid})
+                            except Exception as e:
+                                await ws.send_json({"type": "error", "text": f"Failed to delete project: {e}"})
+                        continue
+
+                    elif msg_type == "rename_project":
+                        pid = data.get("project_id", project_id)
+                        name = data.get("name", "").strip()
+                        if pid and name:
+                            try:
+                                self.gateway.hub.rename_project(pid, name)
+                                await ws.send_json({"type": "project_renamed", "project_id": pid, "name": name})
+                            except Exception as e:
+                                await ws.send_json({"type": "error", "text": f"Failed to rename project: {e}"})
+                        continue
+
                     if not text:
                         continue
 
@@ -176,6 +306,7 @@ class WebChannel:
                             user_id=uid,
                             channel="web",
                             text=text,
+                            project_id=project_id,
                         )
                         await ws.send_json({"type": "message", "text": response})
                     except Exception as e:
@@ -190,6 +321,7 @@ class WebChannel:
                     break
         finally:
             self.connections.pop(session_id, None)
+            self._session_projects.pop(session_id, None)
 
         return ws
 
@@ -220,13 +352,16 @@ class WebChannel:
             await self.push_to_session(sid, text)
 
     async def send_control_message(self, session_id: str, payload: dict):
-        """Push a raw control JSON dict to a session (e.g., to force UI changes)."""
+        """Push a raw control JSON dict to a specific session."""
         ws = self.connections.get(session_id)
         if ws and not ws.closed:
             try:
                 await ws.send_json(payload)
             except Exception:
                 pass
+        # Also update session→project if project_id is carried in payload
+        if payload.get("project_id") and session_id:
+            self._session_projects[session_id] = payload["project_id"]
 
     # ── Workspace C2 Endpoints ────────────────────────────────────
 

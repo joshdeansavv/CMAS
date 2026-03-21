@@ -206,6 +206,31 @@ CHAT_EXTRA_TOOL_DEFS = [
     {
         "type": "function",
         "function": {
+            "name": "delegate_task",
+            "description": (
+                "Spin up a specialized sub-agent to handle a specific task. "
+                "Use this to delegate work to a specialist (e.g. 'Research', 'Code', 'Analysis', 'Writing'). "
+                "The agent runs autonomously and returns findings."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "specialty": {
+                        "type": "string",
+                        "description": "The agent's specialty, e.g. 'Research', 'Code', 'Analysis', 'Writing'",
+                    },
+                    "task": {
+                        "type": "string",
+                        "description": "The specific task for the agent to complete",
+                    },
+                },
+                "required": ["specialty", "task"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "ask_user",
             "description": "Pause your work and ask the user a direct question to get clarification or permission.",
             "parameters": {
@@ -382,7 +407,43 @@ class ChatHandler:
         except Exception:
             pass
 
+        # Auto-title: generate an AI chat title after the first message
+        asyncio.create_task(self._maybe_generate_title(session, user_text))
+
         return response
+
+    async def _maybe_generate_title(self, session: Session, user_text: str):
+        """Generate an AI title for chats still named 'New Chat'."""
+        try:
+            if not session.project_id or not hasattr(self, 'gateway'):
+                return
+            projects = self.gateway.hub.get_projects()
+            project = next((p for p in projects if p["id"] == session.project_id), None)
+            if not project or project["name"] != "New Chat":
+                return
+
+            from .llm import quick_chat
+            title = await quick_chat(
+                messages=[
+                    {"role": "system", "content": "Generate a short chat title (3-6 words, no quotes, no punctuation at the end) that summarizes the user's intent. Reply with ONLY the title."},
+                    {"role": "user", "content": user_text[:300]},
+                ],
+                model=self.model,
+            )
+            title = title.strip().strip('"\'').strip()[:60]
+            if not title:
+                return
+
+            self.gateway.hub.rename_project(session.project_id, title)
+
+            # Push the rename to the frontend
+            if self._control_callback:
+                await self._control_callback(
+                    session.session_id, session.channel,
+                    {"type": "project_renamed", "project_id": session.project_id, "name": title}
+                )
+        except Exception as e:
+            print(f"[ChatHandler] Auto-title failed: {e}")
 
     def _build_system_prompt(self, session: Session, memory_context: str) -> str:
         now = datetime.now()
@@ -448,13 +509,59 @@ class ChatHandler:
         """Build tool handlers with session context baked in."""
         from .tools import web_search, write_file, read_file, list_files, run_python, run_command
 
+        # ── Progress helper ──────────────────────────────────────
+        async def push_progress(text: str):
+            """Push a real-time progress update into the active chat stream."""
+            if self._control_callback:
+                try:
+                    await self._control_callback(
+                        session.session_id, session.channel,
+                        {"type": "progress", "text": text}
+                    )
+                except Exception:
+                    pass
+
+        # ── Tool wrappers with progress feedback ─────────────────
+        async def _web_search(query: str, max_results: int = 5, **kw) -> str:
+            await push_progress(f"Searching the web for \"{query}\"...")
+            result = await web_search(query=query, max_results=max_results)
+            await push_progress(f"Search complete — {len(result.split(chr(10)))} results found.")
+            return result
+
+        async def _write_file(path: str, content: str, **kw) -> str:
+            await push_progress(f"Writing file: `{path}`")
+            result = await write_file(path=path, content=content)
+            await push_progress(f"File written: `{path}` ({len(content)} chars)")
+            return result
+
+        async def _read_file(path: str, **kw) -> str:
+            await push_progress(f"Reading file: `{path}`")
+            return await read_file(path=path)
+
+        async def _list_files(directory: str = ".", **kw) -> str:
+            await push_progress(f"Listing files in: `{directory}`")
+            return await list_files(directory=directory)
+
+        async def _run_python(code: str, **kw) -> str:
+            preview = code.strip().split('\n')[0][:60]
+            await push_progress(f"Running Python: `{preview}{'...' if len(code.strip().split(chr(10))) > 1 else ''}`")
+            result = await run_python(code=code)
+            await push_progress("Python execution complete.")
+            return result
+
+        async def _run_command(command: str, timeout: int = 30, **kw) -> str:
+            await push_progress(f"Running: `{command[:80]}`")
+            result = await run_command(command=command, timeout=timeout)
+            await push_progress("Command complete.")
+            return result
+
         handlers = {
-            "web_search": web_search,
-            "write_file": write_file,
-            "read_file": read_file,
-            "list_files": list_files,
-            "run_python": run_python,
-            "run_command": run_command,
+            "web_search": _web_search,
+            "write_file": _write_file,
+            "read_file":  _read_file,
+            "list_files": _list_files,
+            "run_python": _run_python,
+            "run_command": _run_command,
         }
 
         # Session-aware handlers
@@ -485,8 +592,9 @@ class ChatHandler:
             return self._cancel_job(job_id, session)
 
         async def handle_deep_research(goal: str, **kw) -> str:
+            await push_progress(f"Launching deep research swarm: \"{goal}\"")
             asyncio.create_task(self._run_deep_research(goal, session))
-            return f"Deep research started on: {goal}. I'll let you know when it's done."
+            return f"Deep research launched on: **{goal}**\n\nI've deployed a multi-agent swarm to investigate this. I'll stream progress updates here and send you the full report when complete."
 
         async def handle_remember(topic: str, content: str, category: str = "note", **kw) -> str:
             memory.store(
@@ -523,32 +631,39 @@ class ChatHandler:
 
         async def handle_ask_user(question: str, **kw) -> str:
             if self._push_callback:
-                await self._push_callback(session.session_id, session.channel, f"❓ **Agent needs input**: {question}")
-            
+                await self._push_callback(session.session_id, session.channel, f"**Agent needs input**: {question}")
+
             q = self._steering_queues.setdefault(session.session_id, asyncio.Queue())
-            answer = await q.get()
-            return f"User replied: {answer}"
+            try:
+                answer = await asyncio.wait_for(q.get(), timeout=300)
+                return f"User replied: {answer}"
+            except asyncio.TimeoutError:
+                return "User did not respond within 5 minutes. Proceeding with best judgment."
 
         async def handle_delegate_task(specialty: str, task: str, **kw) -> str:
-            # Dynamically instantiate a specialist and map it to the Roster HUB natively!
+            await push_progress(f"Deploying {specialty} agent: \"{task[:80]}\"")
             from .agent import create_specialist_agent
             from cmas.cli import get_project_dir
             proj_dir = get_project_dir(task[:20])
             agent = create_specialist_agent(
-                f"Specialist_{specialty.replace(' ', '_')}", 
-                specialty, 
+                f"Specialist_{specialty.replace(' ', '_')}",
+                specialty,
                 hub=self.gateway.hub if hasattr(self, 'gateway') else None,
-                workspace=proj_dir, 
+                workspace=proj_dir,
                 model=self.model,
                 gateway=self.gateway if hasattr(self, 'gateway') else None,
                 memory=self.memory
             )
-            
-            # Spin up the agent in the background so it shows on the UI without blocking
+
             from .state import Task as AgentTask
-            agt_task = AgentTask(id=f"delegated_{int(time.time())}", description=task)
+            agt_task = AgentTask(
+                id=f"delegated_{int(time.time())}",
+                description=task,
+                assigned_to=f"Specialist_{specialty.replace(' ', '_')}",
+                project_id=session.project_id,
+                source_channel=session.channel,
+            )
             result = await agent.execute(agt_task)
-            
             return f"Delegation to {specialty} completed. Findings:\n{result}"
 
         handlers["create_reminder"] = handle_create_reminder
@@ -631,23 +746,36 @@ class ChatHandler:
             from cmas.cli import get_project_dir
 
             project_dir = get_project_dir(goal)
+
+            # Progress callback: pipes orchestrator/agent events into the chat stream
+            async def _progress(text: str, agent: str = ""):
+                if self._control_callback:
+                    try:
+                        await self._control_callback(
+                            session.session_id, session.channel,
+                            {"type": "progress", "text": text, "agent": agent}
+                        )
+                    except Exception:
+                        pass
+
+            # Inject the server's Hub, Gateway, Memory, and progress callback
             orchestrator = Orchestrator(
                 project_dir=project_dir,
                 model=self.config.research_model,
                 agent_model=self.config.model,
                 max_iterations=3,
                 local_timezone=self.config.timezone,
+                hub=self.gateway.hub,
+                gateway=self.gateway,
+                memory=self.memory,
+                project_id=session.project_id,
+                progress_callback=_progress,
             )
             result = await orchestrator.run(goal)
 
-            summary = result[:500] if isinstance(result, str) else str(result)[:500]
-            report_path = project_dir / "final_report.md"
-            msg = f"Deep research complete: {goal}\n\nSummary: {summary}"
-            if report_path.exists():
-                msg += f"\n\nFull report saved to: {report_path}"
-
+            # Send the full synthesized report directly into the chat
             if self._push_callback:
-                await self._push_callback(session.session_id, session.channel, msg)
+                await self._push_callback(session.session_id, session.channel, result)
         except Exception as e:
             if self._push_callback:
                 await self._push_callback(

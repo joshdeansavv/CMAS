@@ -5,7 +5,7 @@ import os
 import json
 import asyncio
 import time
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Callable
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 
@@ -89,6 +89,16 @@ async def chat(
                 last_error = e
 
     raise last_error
+
+
+async def quick_chat(
+    messages: List[Dict],
+    model: str = "gpt-4.1-nano",
+    max_tokens: int = 100,
+) -> str:
+    """Single-turn LLM call that returns just the text. No tools, no retries beyond default."""
+    result = await chat(messages=messages, model=model, max_tokens=max_tokens, retries=1, fallback=True)
+    return result.content or ""
 
 
 async def chat_with_tools(

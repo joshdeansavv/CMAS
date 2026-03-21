@@ -44,9 +44,6 @@ class CMASServer:
 
         # Channels (Strictly localhost web interface for now)
         self.web_channel = WebChannel(self.gateway)
-        print(f"[C2 Hub Debug] WebChannel instance type: {type(self.web_channel)}")
-        import inspect
-        print(f"[C2 Hub Debug] Source file for WebChannel: {inspect.getfile(WebChannel)}")
         self.channels = {"web": self.web_channel}
 
         # Set up push callback for proactive messages
@@ -88,9 +85,14 @@ class CMASServer:
 
         # APIs
         app.router.add_get("/health", self._health_handler)
-        app.router.add_get("/api/workspace", self._workspace_handler)
-        app.router.add_get("/api/workspace/file", self._file_handler)
         app.router.add_get("/api/projects", self._projects_handler)
+        app.router.add_delete("/api/projects/{project_id}", self._delete_project_handler)
+        app.router.add_post("/api/projects/{project_id}/stop-all", self._stop_project_handler)
+        app.router.add_get("/api/agents", self._agents_handler)
+        app.router.add_get("/api/tasks", self._tasks_handler)
+        app.router.add_post("/api/tasks/{task_id}/pause", self._task_control_handler)
+        app.router.add_post("/api/tasks/{task_id}/resume", self._task_control_handler)
+        app.router.add_post("/api/tasks/{task_id}/stop", self._task_control_handler)
 
         # External channels explicitly disabled to isolate localhost gateway
         return app
@@ -109,7 +111,7 @@ class CMASServer:
 
     async def _workspace_handler(self, request: web.Request) -> web.Response:
         """Browse the current mission workspace."""
-        path = self.config.workspace_path
+        path = self.config.workspace_dir
         def _get_tree(p):
             res = []
             if not p.exists(): return res
@@ -135,9 +137,87 @@ class CMASServer:
             return web.Response(status=500, text="Unable to read file")
 
     async def _projects_handler(self, request: web.Request) -> web.Response:
-        """List active C2 mission projects."""
+        """List projects enriched with task/agent stats."""
         projects = self.hub.get_projects()
+        all_tasks = self.hub.get_all_tasks()
+        all_agents = self.hub.get_agent_statuses()
+        for p in projects:
+            pid = p["id"]
+            p_tasks = [t for t in all_tasks if t.project_id == pid]
+            p["task_count"] = len(p_tasks)
+            p["active_tasks"] = sum(1 for t in p_tasks if t.status.value == "in_progress")
+            p["active_agents"] = sum(1 for a in all_agents if a.get("project_id") == pid and a.get("status") == "working")
         return web.json_response(projects)
+
+    async def _agents_handler(self, request: web.Request) -> web.Response:
+        """List all agent statuses, optionally filtered by project."""
+        project_id = request.query.get("project_id", "")
+        agents = self.hub.get_agent_statuses()
+        if project_id:
+            agents = [a for a in agents if a.get("project_id") == project_id]
+        return web.json_response(agents)
+
+    async def _tasks_handler(self, request: web.Request) -> web.Response:
+        """List all tasks, optionally filtered by project or status."""
+        project_id = request.query.get("project_id", "")
+        status_filter = request.query.get("status", "")
+        tasks = self.hub.get_all_tasks()
+        if project_id:
+            tasks = [t for t in tasks if t.project_id == project_id]
+        if status_filter:
+            tasks = [t for t in tasks if t.status.value == status_filter]
+        return web.json_response([t.to_dict() for t in tasks])
+
+    async def _delete_project_handler(self, request: web.Request) -> web.Response:
+        """Delete a project and all its data."""
+        project_id = request.match_info["project_id"]
+        try:
+            # Stop all running tasks first
+            self.hub.stop_project_tasks(project_id)
+            # Cancel any gateway-tracked tasks for this project
+            all_tasks = self.hub.get_all_tasks()
+            for t in all_tasks:
+                if t.project_id == project_id:
+                    try:
+                        self.gateway.stop_task(t.id)
+                    except Exception:
+                        pass
+            self.hub.delete_project(project_id)
+            return web.json_response({"ok": True, "project_id": project_id})
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _stop_project_handler(self, request: web.Request) -> web.Response:
+        """Stop all running tasks in a project without deleting it."""
+        project_id = request.match_info["project_id"]
+        try:
+            all_tasks = self.hub.get_all_tasks()
+            stopped = 0
+            for t in all_tasks:
+                if t.project_id == project_id and t.status.value in ("pending", "in_progress"):
+                    try:
+                        self.gateway.stop_task(t.id)
+                        stopped += 1
+                    except Exception:
+                        pass
+            self.hub.stop_project_tasks(project_id)
+            return web.json_response({"ok": True, "project_id": project_id, "stopped": stopped})
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def _task_control_handler(self, request: web.Request) -> web.Response:
+        """Pause, resume, or stop a task by ID."""
+        task_id = request.match_info["task_id"]
+        action = request.path.split("/")[-1]  # pause | resume | stop
+        if action == "pause":
+            self.gateway.pause_task(task_id)
+        elif action == "resume":
+            self.gateway.resume_task(task_id)
+        elif action == "stop":
+            self.gateway.stop_task(task_id)
+        else:
+            return web.json_response({"error": "Unknown action"}, status=400)
+        return web.json_response({"ok": True, "task_id": task_id, "action": action})
 
     # External platforms like Discord disconnected by C2 architectural mandate
 

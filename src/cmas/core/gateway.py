@@ -195,10 +195,12 @@ class Gateway:
         
         if task_id in self._task_pause_events and not self._task_pause_events[task_id].is_set():
             self._print(f"[{agent_name}] INTERCEPTED: Agent sleeping due to Mission Control Pause...")
-            self.hub.set_agent_status(agent_name, "paused", task_id)
+            task = self.hub.get_task(task_id)
+            pid = task.project_id if task else ""
+            self.hub.set_agent_status(agent_name, "paused", task_id, project_id=pid)
             await self._task_pause_events[task_id].wait()
             self._print(f"[{agent_name}] AWOKEN: Agent resuming operations...")
-            self.hub.set_agent_status(agent_name, "working", task_id)
+            self.hub.set_agent_status(agent_name, "working", task_id, project_id=pid)
 
     # ── Loop / Recursion Detection ───────────────────────────────
 
@@ -447,6 +449,7 @@ class Gateway:
 
     async def handle_user_message(
         self, session_id: str, user_id: str, channel: str, text: str,
+        project_id: str = "",
     ) -> str:
         """Entry point for all user messages from any channel.
 
@@ -457,7 +460,9 @@ class Gateway:
         if not hasattr(self, '_chat_handler') or self._chat_handler is None:
             return "System not ready — chat handler not initialized."
 
-        session = self._chat_handler.sessions.get_or_create(session_id, user_id, channel)
+        session = self._chat_handler.sessions.get_or_create(
+            session_id, user_id, channel, project_id
+        )
 
         response = await self._chat_handler.handle(session, text)
 

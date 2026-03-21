@@ -4,13 +4,37 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Callable
 
 from .llm import chat_with_tools
 from .tools import TOOL_DEFS
 from .state import Hub, Task, TaskStatus
 from .memory import Memory
 from .reasoning import Reasoner
+
+
+def _fmt_progress(agent_name: str, tool_name: str, args: dict) -> str:
+    """Format a tool call into a human-readable progress message."""
+    q = args.get('query', '')
+    if tool_name == 'web_search':
+        return f"{agent_name} searching: \"{q[:70]}\""
+    if tool_name == 'delegate_task':
+        sp = args.get('specialty', 'specialist')
+        t  = args.get('task', '')[:60]
+        return f"{agent_name} deploying {sp} agent: \"{t}\""
+    if tool_name == 'send_message':
+        to  = args.get('recipient', 'agent')
+        msg = args.get('content', '')[:70]
+        return f"{agent_name} → {to}: {msg}"
+    if tool_name == 'write_file':
+        from pathlib import Path as _P
+        return f"{agent_name} writing: {_P(args.get('path', 'file')).name}"
+    if tool_name == 'run_python':
+        first_line = args.get('code', '').strip().split('\n')[0][:50]
+        return f"{agent_name} running Python: {first_line}"
+    if tool_name == 'run_command':
+        return f"{agent_name} running: {args.get('command', '')[:60]}"
+    return f"{agent_name} using {tool_name}"
 
 
 class Agent:
@@ -34,6 +58,7 @@ class Agent:
         gateway: Any = None,
         memory: Optional[Memory] = None,
         depth: int = 0,
+        progress_callback: Optional[Callable] = None,
     ):
         self.name = name
         self.role = role
@@ -44,6 +69,7 @@ class Agent:
         self.gateway = gateway
         self.memory = memory
         self.depth = depth
+        self.progress_callback = progress_callback
         self.reasoner = Reasoner(model=model)
         self._log_lines: List[str] = []
 
@@ -207,10 +233,18 @@ COGNITIVE GUIDELINES:
         if self.gateway:
             self.gateway.register_task(task.id)
             
-        self.hub.set_agent_status(self.name, "working", task.id)
+        self.hub.set_agent_status(self.name, "working", task.id,
+                                   project_id=task.project_id, source_channel=task.source_channel)
         self.hub.update_task(task.id, status="in_progress", assigned_to=self.name)
 
         self._log(f"Starting task: {task.description[:80]}")
+        if self.progress_callback:
+            try:
+                await self.progress_callback(
+                    f"{self.name} starting: {task.description[:80]}", self.name
+                )
+            except Exception:
+                pass
 
         # ── Phase 1: REASON ──────────────────────────────────────
         reasoning_context = await self._reason_about_task(task.description)
@@ -242,6 +276,11 @@ COGNITIVE GUIDELINES:
                 await self.gateway.check_interrupt(task.id, self.name)
                 self.gateway.log_trace(self.name, task.id, f"Calling tool: {tool_name}({str(args)[:50]}...)", "tool_call")
             self._log(f"  tool: {tool_name}({str(args)[:60]}...)")
+            if self.progress_callback:
+                try:
+                    await self.progress_callback(_fmt_progress(self.name, tool_name, args), self.name)
+                except Exception:
+                    pass
 
         try:
             if self.gateway:
@@ -257,8 +296,16 @@ COGNITIVE GUIDELINES:
             )
 
             self.hub.update_task(task.id, status="done", result=result[:2000])
-            self.hub.set_agent_status(self.name, "idle")
+            self.hub.set_agent_status(self.name, "idle", project_id=task.project_id)
             self._log(f"Completed task: {task.description[:60]}...")
+            if self.progress_callback:
+                try:
+                    brief = result.replace('\n', ' ')[:120]
+                    await self.progress_callback(
+                        f"{self.name} completed — {brief}", self.name
+                    )
+                except Exception:
+                    pass
 
             # Save result to workspace
             result_path = self.workspace / f"result_{task.id[:8]}.md"
@@ -280,13 +327,13 @@ COGNITIVE GUIDELINES:
         except asyncio.CancelledError as e:
             error_msg = f"Task Terminated via Mission Control: {e}"
             self.hub.update_task(task.id, status="killed", result=error_msg)
-            self.hub.set_agent_status(self.name, "idle")
+            self.hub.set_agent_status(self.name, "idle", project_id=task.project_id)
             self._log(error_msg)
             return error_msg
         except Exception as e:
             error_msg = f"Failed: {e}"
             self.hub.update_task(task.id, status="failed", result=error_msg)
-            self.hub.set_agent_status(self.name, "error")
+            self.hub.set_agent_status(self.name, "error", project_id=task.project_id)
             self._log(error_msg)
 
             if self.memory:
@@ -308,7 +355,8 @@ COGNITIVE GUIDELINES:
 # ── Specialized Agent Factories ──────────────────────────────────────
 
 def create_research_agent(hub: Hub, workspace: Path, model: str = "gpt-4.1-nano",
-                          gateway: Any = None, memory: Optional[Memory] = None, depth: int=0) -> Agent:
+                          gateway: Any = None, memory: Optional[Memory] = None, depth: int = 0,
+                          progress_callback: Optional[Callable] = None) -> Agent:
     return Agent(
         name="ResearchAgent",
         role=(
@@ -318,12 +366,13 @@ def create_research_agent(hub: Hub, workspace: Path, model: str = "gpt-4.1-nano"
             "Always cite your sources with URLs."
         ),
         hub=hub, workspace=workspace / "research", model=model,
-        gateway=gateway, memory=memory, depth=depth,
+        gateway=gateway, memory=memory, depth=depth, progress_callback=progress_callback,
     )
 
 
 def create_analyst_agent(hub: Hub, workspace: Path, model: str = "gpt-4.1-nano",
-                         gateway: Any = None, memory: Optional[Memory] = None, depth: int=0) -> Agent:
+                         gateway: Any = None, memory: Optional[Memory] = None, depth: int = 0,
+                         progress_callback: Optional[Callable] = None) -> Agent:
     return Agent(
         name="AnalystAgent",
         role=(
@@ -333,12 +382,13 @@ def create_analyst_agent(hub: Hub, workspace: Path, model: str = "gpt-4.1-nano",
             "Be rigorous and evidence-based."
         ),
         hub=hub, workspace=workspace / "analysis", model=model,
-        gateway=gateway, memory=memory, depth=depth,
+        gateway=gateway, memory=memory, depth=depth, progress_callback=progress_callback,
     )
 
 
 def create_writer_agent(hub: Hub, workspace: Path, model: str = "gpt-4.1-nano",
-                        gateway: Any = None, memory: Optional[Memory] = None, depth: int=0) -> Agent:
+                        gateway: Any = None, memory: Optional[Memory] = None, depth: int = 0,
+                        progress_callback: Optional[Callable] = None) -> Agent:
     return Agent(
         name="WriterAgent",
         role=(
@@ -348,7 +398,7 @@ def create_writer_agent(hub: Hub, workspace: Path, model: str = "gpt-4.1-nano",
             "to your workspace."
         ),
         hub=hub, workspace=workspace / "reports", model=model,
-        gateway=gateway, memory=memory, depth=depth,
+        gateway=gateway, memory=memory, depth=depth, progress_callback=progress_callback,
     )
 
 
@@ -356,10 +406,11 @@ def create_specialist_agent(
     name: str, specialty: str, hub: Hub, workspace: Path,
     model: str = "gpt-4.1-nano", gateway: Any = None,
     memory: Optional[Memory] = None, depth: int = 0,
+    progress_callback: Optional[Callable] = None,
 ) -> Agent:
     return Agent(
         name=name,
         role=f"You are a specialist in: {specialty}. Apply your expertise to the given task.",
         hub=hub, workspace=workspace / name.lower(), model=model,
-        gateway=gateway, memory=memory, depth=depth,
+        gateway=gateway, memory=memory, depth=depth, progress_callback=progress_callback,
     )

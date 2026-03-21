@@ -1,540 +1,1341 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-  Send as SendIcon, Plus as PlusIcon, Bot as BotIcon, Command as CommandIcon, Activity as ActivityIcon, 
-  Database as DatabaseIcon, FileText as FileTextIcon, X as XIcon, ChevronRight as ChevronRightIcon, LayoutGrid as LayoutGridIcon, 
-  Terminal as TermIcon, Search as SearchIcon, Info as InfoIcon, Settings as SettingsIcon, User as UserIcon, 
-  Globe as GlobeIcon, Zap as ZapIcon, FastForward as FastForwardIcon, Square as SquareIcon, Layers as LayersIcon, MessageSquare as MessageSquareIcon,
-  Cpu as CpuIcon, Hash as HashIcon, Link as LinkIcon, Eye as EyeIcon, Clipboard as ClipboardIcon, List as ListIcon, MoreHorizontal as MoreHorizontalIcon,
-  FolderOpen as FolderOpenIcon, ArrowUpRight as ArrowUpRightIcon, Share2 as Share2Icon, Sparkles as SparklesIcon, Archive as ArchiveIcon, Lock as LockIcon
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Send, Plus, Bot, Activity, X, MessageSquare,
+  Pause, StopCircle, Play, Terminal, List, Filter,
+  Globe, Cpu, Eye, Search, FileText, Code, Command,
+  Loader2, CheckCircle, Zap, ChevronRight, ChevronLeft,
+  Sparkles, Network
 } from 'lucide-react';
 
+// ─── Status config ─────────────────────────────────────────────────────────────
+
+const STATUS_DOT = {
+  working:     'bg-emerald-400 animate-pulse',
+  in_progress: 'bg-emerald-400 animate-pulse',
+  paused:      'bg-amber-400',
+  blocked:     'bg-amber-400',
+  done:        'bg-zinc-500',
+  completed:   'bg-zinc-500',
+  failed:      'bg-red-500',
+  idle:        'bg-zinc-700',
+  pending:     'bg-zinc-700',
+};
+
+const STATUS_TEXT = {
+  working:     'text-emerald-400',
+  in_progress: 'text-emerald-400',
+  paused:      'text-amber-400',
+  blocked:     'text-amber-400',
+  done:        'text-zinc-500',
+  completed:   'text-zinc-500',
+  failed:      'text-red-400',
+  idle:        'text-zinc-600',
+  pending:     'text-zinc-600',
+};
+
+const ACTION_COLOR = {
+  success:      'text-emerald-400',
+  error:        'text-red-400',
+  denied:       'text-amber-400',
+  rate_limited: 'text-amber-400',
+  user_message: 'text-blue-400',
+  response:     'text-zinc-500',
+};
+
+// Derive a stable accent color from any agent name using its characters
+function agentColor(name) {
+  if (!name) return 'text-zinc-500';
+  const n = name.toLowerCase();
+  // Semantic matches for known role keywords
+  if (n.includes('orchestrat'))  return 'text-violet-400';
+  if (n.includes('research'))    return 'text-sky-400';
+  if (n.includes('analyst'))     return 'text-amber-400';
+  if (n.includes('writer'))      return 'text-emerald-400';
+  if (n.includes('develop'))     return 'text-orange-400';
+  if (n.includes('mcts') || n.includes('engine') || n.includes('brain')) return 'text-purple-400';
+  // Fallback: derive a color from a hash of the name so each unique agent
+  // always gets the same color without any hardcoding
+  const COLORS = [
+    'text-sky-400', 'text-amber-400', 'text-emerald-400', 'text-rose-400',
+    'text-indigo-400', 'text-cyan-400', 'text-lime-400', 'text-pink-400',
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0xFFFF;
+  return COLORS[hash % COLORS.length];
+}
+
+// ─── Primitives ────────────────────────────────────────────────────────────────
+
+function StatusDot({ status, size = 'sm' }) {
+  const cls = STATUS_DOT[status] || STATUS_DOT.idle;
+  return <span className={`inline-block rounded-full shrink-0 ${cls} ${size === 'sm' ? 'w-1.5 h-1.5' : 'w-2 h-2'}`} />;
+}
+
+function StatusLabel({ status }) {
+  const cls = STATUS_TEXT[status] || STATUS_TEXT.idle;
+  return <span className={`text-xs ${cls}`}>{status ?? 'idle'}</span>;
+}
+
+function ChannelTag({ channel }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500">
+      <Globe className="w-3 h-3" />{channel || 'web'}
+    </span>
+  );
+}
+
+function timeAgo(ts) {
+  if (!ts) return '';
+  const d = Date.now() / 1000 - ts;
+  if (d < 5)    return 'just now';
+  if (d < 60)   return `${Math.floor(d)}s ago`;
+  if (d < 3600) return `${Math.floor(d / 60)}m ago`;
+  return `${Math.floor(d / 3600)}h ago`;
+}
+
+function progressMeta(text, agent) {
+  const t = text.toLowerCase();
+  // Orchestrator-level phases
+  if (t.includes('pre-screening') || t.includes('dependencies'))  return { Icon: Zap,       color: 'text-violet-400' };
+  if (t.includes('mcts') || t.includes('reasoning'))              return { Icon: Sparkles,   color: 'text-violet-400' };
+  if (t.includes('decomposing') || t.includes('assigning'))       return { Icon: Network,    color: 'text-violet-400' };
+  if (t.includes('synthesiz'))                                     return { Icon: FileText,   color: 'text-violet-400' };
+  if (t.includes('evaluating') || t.includes('metacog'))          return { Icon: CheckCircle, color: 'text-violet-400' };
+  // Agent-level tool use
+  if (t.includes('searching') || t.includes('search'))            return { Icon: Search,     color: agentColor(agent) };
+  if (t.includes('writing') || t.includes('written'))             return { Icon: FileText,   color: agentColor(agent) };
+  if (t.includes('python') || t.includes('running'))              return { Icon: Code,       color: agentColor(agent) };
+  if (t.includes('deploying') || t.includes('spawning'))          return { Icon: Cpu,        color: 'text-indigo-400'  };
+  if (t.includes('→'))                                             return { Icon: MessageSquare, color: agentColor(agent) };
+  if (t.includes('starting'))                                      return { Icon: Loader2,   color: agentColor(agent) };
+  if (t.includes('completed'))                                     return { Icon: CheckCircle, color: agentColor(agent) };
+  return { Icon: Loader2, color: 'text-zinc-600' };
+}
+
+// ─── Activity line (progress inline in chat) ──────────────────────────────────
+
+function ActivityLine({ text, agent }) {
+  const { Icon, color } = progressMeta(text, agent);
+  const isDone = /complet|synthes|found|written/i.test(text);
+  const spinning = Icon === Loader2 && !isDone;
+
+  return (
+    <div className="flex items-start gap-2 py-0.5 max-w-2xl group">
+      <div className={`shrink-0 mt-0.5 ${color}`}>
+        {isDone
+          ? <CheckCircle className="w-3.5 h-3.5" />
+          : <Icon className={`w-3.5 h-3.5 ${spinning ? 'animate-spin' : ''}`} />}
+      </div>
+      <div className="flex items-baseline gap-1.5 min-w-0">
+        {agent && (
+          <span className={`text-[11px] font-semibold shrink-0 ${agentColor(agent)}`}>{agent}</span>
+        )}
+        <span className="text-xs text-zinc-500 font-mono leading-relaxed truncate">{text}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Right Panel ───────────────────────────────────────────────────────────────
+
+function RightPanel({ projectAgents, projectTasks, liveProgress, isOpen, onToggle }) {
+  if (!isOpen) {
+    return (
+      <button onClick={onToggle}
+        className="w-8 flex flex-col items-center py-4 border-l border-zinc-800 text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800/30 transition-colors cursor-pointer shrink-0"
+        title="Open activity panel">
+        <ChevronLeft className="w-3.5 h-3.5" />
+      </button>
+    );
+  }
+
+  const activeAgents = projectAgents.filter(a => a.status === 'working');
+  const idleAgents   = projectAgents.filter(a => a.status !== 'working');
+  const recentTasks  = [...projectTasks]
+    .sort((a, b) => (b.updated_at || b.created_at || 0) - (a.updated_at || a.created_at || 0))
+    .slice(0, 10);
+
+  // Merge live progress with agent roster for richest data
+  const liveKeys = Object.keys(liveProgress);
+  const allActiveNames = [...new Set([...activeAgents.map(a => a.name), ...liveKeys])];
+
+  return (
+    <aside className="w-64 flex flex-col border-l border-zinc-800 shrink-0 overflow-hidden">
+      <div className="h-12 flex items-center justify-between px-4 border-b border-zinc-800 shrink-0">
+        <span className="text-xs font-medium text-zinc-400">Activity</span>
+        <button onClick={onToggle}
+          className="w-6 h-6 flex items-center justify-center text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800 rounded transition-all cursor-pointer">
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+
+        {/* Swarm — active agents with live text */}
+        <div className="px-3 pt-4 pb-2">
+          <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider mb-2 px-1">Swarm</p>
+          {allActiveNames.length === 0 && idleAgents.length === 0 ? (
+            <p className="text-xs text-zinc-700 px-1">No agents deployed.</p>
+          ) : (
+            <div className="space-y-1">
+              {/* Active / with live progress */}
+              {allActiveNames.map(name => {
+                const liveText = liveProgress[name];
+                return (
+                  <div key={name} className="rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                      <span className={`text-[11px] font-medium truncate ${agentColor(name)}`}>{name}</span>
+                    </div>
+                    {liveText && (
+                      <p className="text-[10px] text-zinc-600 mt-1 leading-relaxed line-clamp-2 font-mono">
+                        {liveText}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+              {/* Idle agents */}
+              {idleAgents.filter(a => !allActiveNames.includes(a.name)).map(a => (
+                <div key={a.name} className="flex items-center gap-2 px-1 py-1">
+                  <StatusDot status="idle" />
+                  <span className="text-[11px] text-zinc-600 truncate">{a.name}</span>
+                  <span className="text-[10px] text-zinc-700 ml-auto shrink-0">idle</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="mx-3 border-t border-zinc-800/60 my-2" />
+
+        {/* Tasks — grouped by status, most recent first */}
+        <div className="px-3 pb-4">
+          <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider mb-2 px-1">Tasks</p>
+          {recentTasks.length === 0 ? (
+            <p className="text-xs text-zinc-700 px-1">No tasks yet.</p>
+          ) : (
+            <div className="space-y-1">
+              {recentTasks.map(t => (
+                <div key={t.id} className="px-1 py-1.5">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <StatusDot status={t.status} />
+                    {t.assigned_to && (
+                      <span className={`text-[10px] font-medium ${agentColor(t.assigned_to)}`}>
+                        {t.assigned_to}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-zinc-700 ml-auto font-mono shrink-0">{timeAgo(t.updated_at || t.created_at)}</span>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 leading-relaxed line-clamp-2 pl-3">
+                    {t.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+      </div>
+    </aside>
+  );
+}
+
+// ─── Inject Bar (interject into running swarm) ─────────────────────────────────
+
+function InjectBar({ onSteer }) {
+  const [open, setOpen]   = useState(false);
+  const [text, setText]   = useState('');
+  const inputRef          = useRef(null);
+
+  useEffect(() => { if (open) inputRef.current?.focus(); }, [open]);
+
+  const submit = () => {
+    if (!text.trim()) return;
+    onSteer(text.trim());
+    setText('');
+    setOpen(false);
+  };
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)}
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-zinc-700 text-zinc-600 hover:text-zinc-400 hover:border-zinc-500 transition-colors cursor-pointer text-xs">
+        <Zap className="w-3.5 h-3.5" />
+        Interject — inject guidance into the running swarm
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-amber-500/30 bg-amber-500/5">
+      <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+      <input
+        ref={inputRef}
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') { setText(''); setOpen(false); } }}
+        placeholder="Type guidance to steer the agents..."
+        className="flex-1 bg-transparent text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none"
+      />
+      <button onClick={submit} disabled={!text.trim()}
+        className="px-2.5 py-1 rounded-md text-xs bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 disabled:opacity-30 transition-colors cursor-pointer shrink-0">
+        Inject
+      </button>
+      <button onClick={() => { setText(''); setOpen(false); }}
+        className="text-zinc-600 hover:text-zinc-400 cursor-pointer shrink-0">
+        <X className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
+// ─── Chat View ─────────────────────────────────────────────────────────────────
+
+function ChatView({ messages, isTyping, input, setInput, sendMessage, activeProject, connected, projectAgents, liveProgress, onSteer }) {
+  const endRef      = useRef(null);
+  const textareaRef = useRef(null);
+
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isTyping]);
+
+  const onChange = (e) => {
+    setInput(e.target.value);
+    e.target.style.height = 'auto';
+    e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+  };
+
+  // Live progress entries: at most one line per agent, showing current activity
+  const liveEntries = Object.entries(liveProgress).filter(([, text]) => text);
+  const isSwarmActive = liveEntries.length > 0 || projectAgents.some(a => a.status === 'working');
+
+  return (
+    <div className="flex flex-col flex-1 overflow-hidden">
+
+      {/* Live activity strip — one line per agent, replaces in-place */}
+      {isSwarmActive && (
+        <div className="px-4 py-2 border-b border-zinc-800 bg-zinc-900/40 shrink-0 overflow-hidden">
+          <div className="max-w-2xl mx-auto space-y-0.5">
+            {liveEntries.map(([agent, text]) => (
+              <div key={agent} className="flex items-center gap-2 min-w-0">
+                <Loader2 className={`w-3 h-3 shrink-0 animate-spin ${agentColor(agent)}`} />
+                <span className={`text-[11px] font-medium shrink-0 ${agentColor(agent)}`}>{agent}</span>
+                <span className="text-[11px] text-zinc-500 font-mono truncate">{text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto px-6 py-8 space-y-3">
+
+          {messages.length === 0 && !isTyping && (
+            <div className="flex flex-col items-center justify-center py-24 text-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                <Bot className="w-5 h-5 text-zinc-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-zinc-300">
+                  {activeProject ? activeProject.name : 'No chat selected'}
+                </p>
+                <p className="text-sm text-zinc-600 mt-1">
+                  {activeProject
+                    ? 'Send a message to deploy the agent swarm.'
+                    : 'Select or create a chat to begin.'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {messages.map((m, i) => {
+            if (m.role === 'progress') {
+              return <ActivityLine key={i} text={m.text} agent={m.agent} />;
+            }
+
+            if (m.role === 'user') {
+              return (
+                <div key={i} className="flex justify-end pt-1">
+                  <div className="max-w-[72%] bg-zinc-800 text-zinc-100 px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm leading-relaxed">
+                    {m.text.split('\n').map((line, j) => (
+                      <p key={j} className={j > 0 ? 'mt-1.5' : ''}>{line || '\u00A0'}</p>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
+            if (m.role === 'system') {
+              return (
+                <div key={i} className="flex items-start gap-2.5 pt-1">
+                  <div className="w-5 h-5 rounded-md bg-red-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <Activity className="w-3 h-3 text-red-400" />
+                  </div>
+                  <p className="text-sm text-red-400/80 leading-relaxed">{m.text}</p>
+                </div>
+              );
+            }
+
+            // assistant — render markdown-ish (newlines → paragraphs, ### headers)
+            return (
+              <div key={i} className="flex items-start gap-2.5 pt-1">
+                <div className="w-5 h-5 rounded-md bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 mt-0.5">
+                  <Bot className="w-3 h-3 text-zinc-400" />
+                </div>
+                <div className="flex-1 min-w-0 text-sm text-zinc-200 leading-relaxed space-y-2">
+                  {m.text.split('\n').map((line, j) => {
+                    if (line.startsWith('### ')) return <p key={j} className="font-semibold text-zinc-100 mt-1">{line.slice(4)}</p>;
+                    if (line.startsWith('## '))  return <p key={j} className="font-semibold text-zinc-100 text-base mt-2">{line.slice(3)}</p>;
+                    if (line.startsWith('# '))   return <p key={j} className="font-bold text-zinc-100 text-base mt-2">{line.slice(2)}</p>;
+                    if (line.startsWith('- ') || line.startsWith('* ')) return <p key={j} className="pl-3 text-zinc-300">· {line.slice(2)}</p>;
+                    return <p key={j} className={line === '' ? 'mt-1' : ''}>{line || '\u00A0'}</p>;
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          {isTyping && (
+            <div className="flex items-start gap-2.5 pt-1">
+              <div className="w-5 h-5 rounded-md bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 mt-0.5">
+                <Bot className="w-3 h-3 text-zinc-400" />
+              </div>
+              <div className="flex gap-1 items-center h-5">
+                {[0, 150, 300].map(d => (
+                  <div key={d} className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
+                ))}
+              </div>
+            </div>
+          )}
+          <div ref={endRef} />
+        </div>
+      </div>
+
+      {/* Input */}
+      <div className="px-6 pb-6 pt-2 space-y-2">
+        <div className="max-w-2xl mx-auto space-y-2">
+          {/* Interject bar — visible when swarm is active */}
+          {isSwarmActive && (
+            <InjectBar onSteer={onSteer} />
+          )}
+          {/* Main input */}
+          <form onSubmit={sendMessage}>
+            <div className="flex items-end gap-2 bg-zinc-900 border border-zinc-700 focus-within:border-zinc-500 rounded-xl transition-colors">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={onChange}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e); } }}
+                placeholder={
+                  !activeProject ? 'Select a chat first...' :
+                  !connected ? 'Connecting...' :
+                  isSwarmActive ? 'Queue next message...' : 'Message...'
+                }
+                disabled={!activeProject || !connected}
+                rows={1}
+                className="flex-1 bg-transparent px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none resize-none"
+                style={{ minHeight: '46px', maxHeight: '160px' }}
+              />
+              <button
+                type="submit"
+                disabled={!input.trim() || !activeProject || !connected}
+                className="m-1.5 h-8 w-8 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center shrink-0 cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5 text-zinc-300" />
+              </button>
+            </div>
+            <p className="text-center text-xs text-zinc-700 mt-1.5">Enter to send · Shift+Enter for newline</p>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Agents View ───────────────────────────────────────────────────────────────
+
+function agentRoleHint(name) {
+  if (!name) return 'Agent';
+  const n = name.toLowerCase();
+  if (n.includes('orchestrat')) return 'Orchestrator';
+  if (n.includes('research'))   return 'Research';
+  if (n.includes('analyst'))    return 'Analysis';
+  if (n.includes('writer'))     return 'Writing';
+  if (n.includes('develop'))    return 'Development';
+  if (n.includes('specialist')) {
+    // e.g. "Specialist_Marine_Biology_a3f2" → "Marine Biology"
+    const parts = name.split('_').slice(1, -1);
+    if (parts.length) return parts.join(' ');
+  }
+  return 'Specialist';
+}
+
+function AgentsView({ roster, activeProjectId, onInspect, wsAction }) {
+  const agents = Object.values(roster);
+  // Show all agents for the active project, fall back to all if no filter
+  const shown = activeProjectId
+    ? agents.filter(a => !a.project_id || a.project_id === activeProjectId)
+    : agents;
+
+  const working = shown.filter(a => a.status === 'working' || a.status === 'in_progress');
+  const idle    = shown.filter(a => a.status !== 'working' && a.status !== 'in_progress');
+
+  if (shown.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center flex-1 text-center gap-3">
+        <Cpu className="w-8 h-8 text-zinc-700" />
+        <p className="text-sm text-zinc-500">No agents deployed yet.</p>
+        <p className="text-xs text-zinc-700">Send a message to start the swarm.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto p-6">
+      <div className="max-w-3xl mx-auto space-y-6">
+
+        {/* Active agents */}
+        {working.length > 0 && (
+          <section>
+            <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider mb-3">
+              Active · {working.length}
+            </p>
+            <div className="space-y-2">
+              {working.map(agent => (
+                <div key={agent.name}
+                  className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 group">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative shrink-0">
+                        <div className={`w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center`}>
+                          <Cpu className={`w-4 h-4 ${agentColor(agent.name)}`} />
+                        </div>
+                        <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-zinc-900 animate-pulse" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-sm font-medium ${agentColor(agent.name)}`}>{agent.name}</p>
+                        <p className="text-[11px] text-zinc-600">{agentRoleHint(agent.name)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => onInspect(agent.name)}
+                        className="flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 rounded-md transition-all cursor-pointer">
+                        <Eye className="w-3 h-3" /> Inspect
+                      </button>
+                      {agent.current_task && (
+                        <button onClick={() => wsAction('stop_task', { task_id: agent.current_task })}
+                          className="p-1 text-red-400/60 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all cursor-pointer" title="Stop">
+                          <StopCircle className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {agent.current_task && (
+                    <p className="mt-3 text-xs text-zinc-500 leading-relaxed border-t border-zinc-800 pt-3 line-clamp-2">
+                      {agent.current_task}
+                    </p>
+                  )}
+                  <div className="mt-2 flex items-center gap-3">
+                    <span className="text-[10px] text-zinc-700 font-mono">{timeAgo(agent.updated_at)}</span>
+                    {agent.source_channel && <ChannelTag channel={agent.source_channel} />}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Idle agents */}
+        {idle.length > 0 && (
+          <section>
+            <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider mb-3">
+              Standby · {idle.length}
+            </p>
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl divide-y divide-zinc-800">
+              {idle.map(agent => (
+                <div key={agent.name}
+                  className="flex items-center gap-3 px-4 py-3 group hover:bg-zinc-800/40 transition-colors">
+                  <StatusDot status={agent.status || 'idle'} />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs text-zinc-400">{agent.name}</span>
+                    <span className="text-[10px] text-zinc-700 ml-2">{agentRoleHint(agent.name)}</span>
+                  </div>
+                  <span className="text-[10px] text-zinc-700 font-mono">{timeAgo(agent.updated_at)}</span>
+                  <button onClick={() => onInspect(agent.name)}
+                    className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700 rounded-md transition-all cursor-pointer">
+                    <Eye className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+// ─── Tasks View ────────────────────────────────────────────────────────────────
+
+const STATUS_ORDER = ['in_progress', 'pending', 'paused', 'blocked', 'failed', 'done', 'completed', 'killed'];
+
+function TaskCard({ task, wsAction }) {
+  return (
+    <div className="flex items-start gap-3 px-4 py-3 hover:bg-zinc-800/30 group transition-colors">
+      <StatusDot status={task.status} size="md" className="mt-0.5 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-zinc-300 leading-relaxed line-clamp-2" title={task.description}>
+          {task.description}
+        </p>
+        <div className="flex items-center gap-2 mt-1">
+          <span className={`text-[10px] font-medium ${STATUS_TEXT[task.status] || 'text-zinc-600'}`}>{task.status}</span>
+          <span className="text-[10px] text-zinc-700 font-mono">{task.id}</span>
+          <span className="text-[10px] text-zinc-700 font-mono ml-auto">{timeAgo(task.created_at)}</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        {task.status === 'in_progress' && (
+          <button onClick={() => wsAction('pause_task', { task_id: task.id })}
+            className="p-1 text-amber-400 hover:bg-amber-500/10 rounded cursor-pointer" title="Pause">
+            <Pause className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {task.status === 'paused' && (
+          <button onClick={() => wsAction('resume_task', { task_id: task.id })}
+            className="p-1 text-emerald-400 hover:bg-emerald-500/10 rounded cursor-pointer" title="Resume">
+            <Play className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {['in_progress', 'paused', 'pending'].includes(task.status) && (
+          <button onClick={() => wsAction('stop_task', { task_id: task.id })}
+            className="p-1 text-red-400 hover:bg-red-500/10 rounded cursor-pointer" title="Stop">
+            <StopCircle className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TasksView({ tasks, activeProjectId, wsAction }) {
+  const [groupBy, setGroupBy] = useState('agent'); // 'agent' | 'status'
+  const [search, setSearch]   = useState('');
+
+  const scoped = (activeProjectId ? tasks.filter(t => t.project_id === activeProjectId) : tasks)
+    .filter(t => !search || t.description?.toLowerCase().includes(search.toLowerCase()));
+
+  if ((activeProjectId ? tasks.filter(t => t.project_id === activeProjectId) : tasks).length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center flex-1 text-center gap-3">
+        <List className="w-8 h-8 text-zinc-700" />
+        <p className="text-sm text-zinc-500">No tasks yet.</p>
+        <p className="text-xs text-zinc-700">Tasks appear when agents are deployed.</p>
+      </div>
+    );
+  }
+
+  // ── Group by Agent ──────────────────────────────────────────────
+  const renderByAgent = () => {
+    const groups = {};
+    for (const t of scoped) {
+      const key = t.assigned_to || 'Unassigned';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(t);
+    }
+    // Sort groups: active agents first, then by name
+    const sorted = Object.entries(groups).sort(([a], [b]) => {
+      if (a === 'Unassigned') return 1;
+      if (b === 'Unassigned') return -1;
+      const aActive = groups[a].some(t => t.status === 'in_progress');
+      const bActive = groups[b].some(t => t.status === 'in_progress');
+      if (aActive && !bActive) return -1;
+      if (!aActive && bActive) return 1;
+      return a.localeCompare(b);
+    });
+
+    return sorted.map(([agentName, agentTasks]) => {
+      const active = agentTasks.filter(t => t.status === 'in_progress' || t.status === 'pending');
+      const done   = agentTasks.filter(t => ['done','completed','killed','failed'].includes(t.status));
+      const sorted = [...active, ...done].sort((a, b) =>
+        STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
+      return (
+        <section key={agentName}>
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-zinc-800 sticky top-0 bg-zinc-950 z-10">
+            {active.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />}
+            <span className={`text-xs font-medium ${agentName === 'Unassigned' ? 'text-zinc-600' : agentColor(agentName)}`}>
+              {agentName}
+            </span>
+            <span className="text-[10px] text-zinc-700">{agentTasks.length} task{agentTasks.length !== 1 ? 's' : ''}</span>
+            {active.length > 0 && (
+              <span className="text-[10px] text-emerald-600 ml-auto">{active.length} active</span>
+            )}
+          </div>
+          <div className="divide-y divide-zinc-800/40">
+            {sorted.map(t => <TaskCard key={t.id} task={t} wsAction={wsAction} />)}
+          </div>
+        </section>
+      );
+    });
+  };
+
+  // ── Group by Status ─────────────────────────────────────────────
+  const renderByStatus = () => {
+    const groups = {};
+    for (const t of scoped) {
+      if (!groups[t.status]) groups[t.status] = [];
+      groups[t.status].push(t);
+    }
+    return STATUS_ORDER.filter(s => groups[s]?.length).map(status => (
+      <section key={status}>
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-zinc-800 sticky top-0 bg-zinc-950 z-10">
+          <StatusDot status={status} />
+          <span className={`text-xs font-medium ${STATUS_TEXT[status] || 'text-zinc-500'}`}>{status}</span>
+          <span className="text-[10px] text-zinc-700">{groups[status].length}</span>
+        </div>
+        <div className="divide-y divide-zinc-800/40">
+          {groups[status].map(t => <TaskCard key={t.id} task={t} wsAction={wsAction} />)}
+        </div>
+      </section>
+    ));
+  };
+
+  return (
+    <div className="flex flex-col flex-1 overflow-hidden">
+      {/* Toolbar */}
+      <div className="px-4 py-2.5 border-b border-zinc-800 flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-0.5 bg-zinc-900 rounded-lg p-0.5 border border-zinc-800">
+          {[{ key: 'agent', label: 'By Agent' }, { key: 'status', label: 'By Status' }].map(v => (
+            <button key={v.key} onClick={() => setGroupBy(v.key)}
+              className={`px-2.5 py-1 rounded-md text-xs transition-colors cursor-pointer ${
+                groupBy === v.key ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
+              }`}>
+              {v.label}
+            </button>
+          ))}
+        </div>
+        <div className="ml-auto flex items-center gap-2 border border-zinc-800 rounded-md px-2.5 py-1">
+          <Filter className="w-3 h-3 text-zinc-600" />
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Filter tasks..."
+            className="bg-transparent text-xs text-zinc-300 placeholder:text-zinc-600 focus:outline-none w-28" />
+        </div>
+        <span className="text-[10px] text-zinc-700 font-mono">{scoped.length} tasks</span>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {scoped.length === 0
+          ? <p className="text-center text-xs text-zinc-600 py-10">No tasks match filter.</p>
+          : groupBy === 'agent' ? renderByAgent() : renderByStatus()
+        }
+      </div>
+    </div>
+  );
+}
+
+// ─── Logs View ─────────────────────────────────────────────────────────────────
+
+function LogsView({ telemetry }) {
+  const [agentFilter, setAgentFilter] = useState('');
+  const [paused, setPaused]           = useState(false);
+  const [frozen, setFrozen]           = useState([]);
+  const topRef                        = useRef(null);
+
+  useEffect(() => {
+    if (!paused) topRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [telemetry, paused]);
+
+  const togglePause = () => {
+    if (!paused) setFrozen([...telemetry]);
+    setPaused(p => !p);
+  };
+
+  const logs   = paused ? frozen : telemetry;
+  const agents = [...new Set(logs.map(l => l.agent).filter(Boolean))];
+  const shown  = agentFilter ? logs.filter(l => l.agent === agentFilter) : logs;
+
+  return (
+    <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-zinc-800 flex items-center gap-3 shrink-0">
+        <span className="text-xs text-zinc-500 font-medium">Telemetry</span>
+        <span className="text-xs text-zinc-700 font-mono">{shown.length} events</span>
+        <div className="flex-1" />
+        {agents.length > 0 && (
+          <select value={agentFilter} onChange={e => setAgentFilter(e.target.value)}
+            className="bg-transparent border border-zinc-800 rounded-md px-2 py-1 text-xs text-zinc-400 focus:outline-none cursor-pointer">
+            <option value="">All agents</option>
+            {agents.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        )}
+        <button onClick={togglePause}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-colors cursor-pointer ${
+            paused ? 'text-emerald-400 hover:bg-zinc-800' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
+          }`}>
+          {paused ? <><Play className="w-3 h-3" /> Resume</> : <><Pause className="w-3 h-3" /> Pause</>}
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto font-mono text-[11px] leading-5 py-2">
+        <div ref={topRef} />
+        {shown.length === 0 && (
+          <p className="text-zinc-700 text-center py-16">No events yet. Activity streams here in real time.</p>
+        )}
+        {shown.map((log, i) => (
+          <div key={log.id || i}
+            className="flex items-start gap-3 px-4 py-0.5 hover:bg-zinc-800/30 transition-colors">
+            <span className="text-zinc-700 shrink-0 w-14 tabular-nums select-none">{log.ts}</span>
+            <span className={`shrink-0 w-32 truncate ${agentColor(log.agent)}`}>[{log.agent}]</span>
+            <span className={`shrink-0 w-16 ${ACTION_COLOR[log.action] || 'text-zinc-500'}`}>{log.action}</span>
+            <span className="text-zinc-600 shrink-0 w-20 truncate">{log.tool}</span>
+            <span className="text-zinc-700 flex-1 truncate">{log.result || log.args || ''}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Agent Inspect Modal ───────────────────────────────────────────────────────
+
+function AgentModal({ agent, agentData, traces, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-8 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}>
+      <div className="w-full max-w-lg max-h-[80vh] bg-zinc-900 border border-zinc-700/60 rounded-xl overflow-hidden shadow-2xl flex flex-col"
+        onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+          <div className="flex items-center gap-3">
+            <StatusDot status={agentData?.status || 'idle'} size="md" />
+            <div>
+              <p className={`text-sm font-medium ${agentColor(agent)}`}>{agent}</p>
+              <p className="text-xs text-zinc-500">
+                {agentData?.status || 'idle'}
+                {agentData?.current_task ? ` — ${agentData.current_task.slice(0, 60)}` : ''}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose}
+            className="w-7 h-7 flex items-center justify-center text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 rounded-md transition-all cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="overflow-y-auto flex-1 p-5 space-y-4">
+          {!(traces?.length)
+            ? <p className="text-xs text-zinc-600 text-center py-10">No trace recorded yet.</p>
+            : traces.map((t, i) => (
+              <div key={i} className="space-y-1">
+                <span className="text-[10px] text-zinc-600 font-mono">{t.ts} · {t.type}</span>
+                <p className="text-xs text-zinc-300 whitespace-pre-wrap break-words leading-relaxed">{t.content}</p>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Project List (sidebar) ────────────────────────────────────────────────────
+
+function ProjectList({ projects, activeProjectId, onSelect, onDelete, onStop, onRename }) {
+  const [menuFor, setMenuFor]       = useState(null); // project id with open menu
+  const [renaming, setRenaming]     = useState(null); // project id being renamed
+  const [renameVal, setRenameVal]   = useState('');
+  const [confirming, setConfirming] = useState(null); // project id pending delete confirm
+  const menuRef = useRef(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuFor(null); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const startRename = (p) => {
+    setRenameVal(p.name);
+    setRenaming(p.id);
+    setMenuFor(null);
+  };
+
+  const commitRename = (pid) => {
+    if (renameVal.trim()) onRename(pid, renameVal.trim());
+    setRenaming(null);
+  };
+
+  return (
+    <nav className="flex-1 overflow-y-auto px-3 pb-3 space-y-0.5 mt-1">
+      {projects.length === 0 && (
+        <p className="text-xs text-zinc-700 px-2.5 py-2">No chats yet.</p>
+      )}
+      {projects.map(p => {
+        const isActive = p.id === activeProjectId;
+        const hasActivity = p.active_agents > 0 || p.active_tasks > 0;
+        return (
+          <div key={p.id} className="relative group">
+            {renaming === p.id ? (
+              <input
+                autoFocus
+                value={renameVal}
+                onChange={e => setRenameVal(e.target.value)}
+                onBlur={() => commitRename(p.id)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') commitRename(p.id);
+                  if (e.key === 'Escape') setRenaming(null);
+                }}
+                className="w-full px-2.5 py-2 text-xs bg-zinc-800 border border-zinc-600 rounded-md text-zinc-100 focus:outline-none"
+              />
+            ) : (
+              <button onClick={() => onSelect(p.id)}
+                className={`w-full text-left flex items-start gap-2 px-2.5 py-2 rounded-md transition-colors cursor-pointer ${
+                  isActive ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60'
+                }`}>
+                <MessageSquare className="w-3.5 h-3.5 shrink-0 mt-0.5 opacity-50" />
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs truncate block">{p.name}</span>
+                  {hasActivity && (
+                    <span className="text-[10px] text-emerald-500/60 mt-0.5 block">
+                      {p.active_agents > 0 ? `${p.active_agents} agent${p.active_agents !== 1 ? 's' : ''} active` : `${p.active_tasks} running`}
+                    </span>
+                  )}
+                </div>
+                {/* Context menu trigger */}
+                <button
+                  onClick={e => { e.stopPropagation(); setMenuFor(menuFor === p.id ? null : p.id); }}
+                  className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center text-zinc-500 hover:text-zinc-200 rounded transition-all cursor-pointer shrink-0 mt-0.5"
+                  title="Options">
+                  <span className="text-base leading-none tracking-widest" style={{ letterSpacing: '-1px' }}>···</span>
+                </button>
+              </button>
+            )}
+
+            {/* Context menu */}
+            {menuFor === p.id && (
+              <div ref={menuRef}
+                className="absolute right-0 top-8 z-50 w-44 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden py-1">
+                <button onClick={() => startRename(p)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors cursor-pointer">
+                  <span className="text-zinc-500">✎</span> Rename
+                </button>
+                {hasActivity && (
+                  <button onClick={() => { onStop(p.id); setMenuFor(null); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer">
+                    <Pause className="w-3.5 h-3.5" /> Stop All Tasks
+                  </button>
+                )}
+                <div className="mx-2 my-1 border-t border-zinc-800" />
+                {confirming === p.id ? (
+                  <div className="px-3 py-2">
+                    <p className="text-[11px] text-zinc-400 mb-2">Delete this chat and all its data?</p>
+                    <div className="flex gap-1.5">
+                      <button onClick={() => { onDelete(p.id); setMenuFor(null); setConfirming(null); }}
+                        className="flex-1 py-1 text-[11px] bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-md transition-colors cursor-pointer">
+                        Delete
+                      </button>
+                      <button onClick={() => setConfirming(null)}
+                        className="flex-1 py-1 text-[11px] bg-zinc-800 text-zinc-400 hover:bg-zinc-700 rounded-md transition-colors cursor-pointer">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setConfirming(p.id)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer">
+                    <X className="w-3.5 h-3.5" /> Delete Chat
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </nav>
+  );
+}
+
+// ─── Main App ──────────────────────────────────────────────────────────────────
+
+const TABS = [
+  { key: 'chat',   label: 'Chat',   Icon: MessageSquare },
+  { key: 'agents', label: 'Agents', Icon: Cpu           },
+  { key: 'tasks',  label: 'Tasks',  Icon: List          },
+  { key: 'logs',   label: 'Logs',   Icon: Terminal      },
+];
+
 export default function App() {
-  const [ws, setWs] = useState(null);
-  const [activeProjectId, setActiveProjectId] = useState(localStorage.getItem('cmas_project_id') || '');
-  const [sessionId, setSessionId] = useState(localStorage.getItem('cmas_session_id') || '');
-  const [projects, setProjects] = useState([]);
-  const [sessions, setSessions] = useState([]);
-  const [messages, setMessages] = useState([]);
-  const [roster, setRoster] = useState({});
-  const [telemetry, setTelemetry] = useState([]);
-  const [traces, setTraces] = useState({});
-  const [comms, setComms] = useState([]); // Agent-to-Agent links
-  const [input, setInput] = useState('');
-  const [connected, setConnected] = useState(false);
-  const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'swarm' | 'files'
-  const [fileTree, setFileTree] = useState([]);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [fileContent, setFileContent] = useState(null);
-  const [isLoadingFile, setIsLoadingFile] = useState(false);
+  const [ws, setWs]                   = useState(null);
+  const [connected, setConnected]     = useState(false);
+  const [activeTab, setActiveTab]     = useState('chat');
+  const [projects, setProjects]       = useState([]);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [activeProjectId, setActiveProjectId] = useState(
+    () => localStorage.getItem('cmas_project_id') || ''
+  );
+
+  const projectSessionsRef = useRef(null);
+  if (projectSessionsRef.current === null) {
+    try { projectSessionsRef.current = JSON.parse(localStorage.getItem('cmas_project_sessions') || '{}'); }
+    catch { projectSessionsRef.current = {}; }
+  }
+  const getSessionForProject = useCallback((pid) => pid ? (projectSessionsRef.current[pid] || '') : '', []);
+  const storeSessionForProject = useCallback((pid, sid) => {
+    if (!pid || !sid) return;
+    projectSessionsRef.current[pid] = sid;
+    localStorage.setItem('cmas_project_sessions', JSON.stringify(projectSessionsRef.current));
+  }, []);
+
+  const [sessionId, setSessionId] = useState(() => {
+    const pid = localStorage.getItem('cmas_project_id') || '';
+    try {
+      const map = JSON.parse(localStorage.getItem('cmas_project_sessions') || '{}');
+      return (pid && map[pid]) || '';
+    } catch { return ''; }
+  });
+
+  const [messages, setMessages]       = useState([]);
+  const [liveProgress, setLiveProgress] = useState({});
+  const [roster, setRoster]           = useState({});
+  const [tasks, setTasks]             = useState([]);
+  const [telemetry, setTelemetry]     = useState([]);
+  const [traces, setTraces]           = useState({});
+  const [input, setInput]             = useState('');
+  const [isTyping, setIsTyping]       = useState(false);
   const [inspectAgent, setInspectAgent] = useState(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isAssetDrawerOpen, setIsAssetDrawerOpen] = useState(false);
 
-  const messagesEndRef = useRef(null);
-  const telemetryEndRef = useRef(null);
+  const activeProjectRef = useRef(activeProjectId);
+  useEffect(() => { activeProjectRef.current = activeProjectId; }, [activeProjectId]);
+  const sessionIdRef = useRef(sessionId);
+  useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
 
+  // ── Data ────────────────────────────────────────────────────────
+  const loadProjects = useCallback(async () => {
+    try { const r = await fetch('/api/projects'); if (r.ok) setProjects(await r.json()); } catch {}
+  }, []);
+
+  const loadTasks = useCallback(async (pid) => {
+    try {
+      const r = await fetch(pid ? `/api/tasks?project_id=${pid}` : '/api/tasks');
+      if (r.ok) setTasks(await r.json());
+    } catch {}
+  }, []);
+
+  const loadAgents = useCallback(async (pid) => {
+    try {
+      const r = await fetch(pid ? `/api/agents?project_id=${pid}` : '/api/agents');
+      if (r.ok) {
+        const list = await r.json();
+        setRoster(prev => {
+          const next = { ...prev };
+          list.forEach(a => { next[a.name] = { ...next[a.name], ...a }; });
+          return next;
+        });
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => { loadProjects(); }, [loadProjects]);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (activeTab === 'tasks')  loadTasks(activeProjectId);
+    if (activeTab === 'agents') loadAgents(activeProjectId);
+  }, [activeTab, activeProjectId, loadTasks, loadAgents]);
 
-  // APIs
-  const loadProjects = async () => {
-    try {
-      const res = await fetch(`http://${window.location.host}/api/projects`);
-      if (res.ok) setProjects(await res.json());
-    } catch (e) { console.error("Projects error", e); }
-  };
-
-  const loadFileTree = async () => {
-    try {
-      const res = await fetch(`http://${window.location.host}/api/workspace`);
-      if (res.ok) setFileTree(await res.json());
-    } catch (e) { console.error("Workspace error", e); }
-  };
-
-  const loadFileContent = async (path) => {
-    setIsLoadingFile(true);
-    setSelectedFile(path);
-    try {
-      const res = await fetch(`http://${window.location.host}/api/workspace/file?path=${encodeURIComponent(path)}`);
-      if (res.ok) setFileContent((await res.json()).content);
-    } catch (e) { setFileContent("// Error loading"); }
-    finally { setIsLoadingFile(false); }
-  };
-
-  useEffect(() => { loadProjects(); loadFileTree(); }, []);
-
-  // WebSocket
+  // ── WebSocket ───────────────────────────────────────────────────
   useEffect(() => {
-    let socket = null;
-    let reconnectTimeout = null;
+    let socket = null, timer = null, dead = false;
 
     const connect = () => {
-      const url = `ws://${window.location.host}/ws?session_id=${sessionId}&user_id=web_user&project_id=${activeProjectId}`;
+      if (dead) return;
+      const pid = activeProjectRef.current;
+      const sid = sessionIdRef.current;
+      const url = `ws://${window.location.host}/ws?user_id=web_user&project_id=${encodeURIComponent(pid)}${sid ? `&session_id=${encodeURIComponent(sid)}` : ''}`;
       socket = new WebSocket(url);
 
       socket.onopen = () => {
         setConnected(true);
-        socket.send(JSON.stringify({ type: 'get_sessions' }));
-        if (sessionId) socket.send(JSON.stringify({ type: 'get_history' }));
+        socket.send(JSON.stringify({ type: 'get_tasks', project_id: pid }));
+        if (sid) socket.send(JSON.stringify({ type: 'get_history' }));
       };
-
-      socket.onclose = () => {
-        setConnected(false);
-        reconnectTimeout = setTimeout(connect, 3000);
-      };
-
-      socket.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        handleMessage(data);
-      };
-
+      socket.onclose  = () => { if (!dead) { setConnected(false); timer = setTimeout(connect, 3000); } };
+      socket.onerror  = () => { socket.close(); };
+      socket.onmessage = (e) => { try { handleMessage(JSON.parse(e.data)); } catch {} };
       setWs(socket);
     };
 
     connect();
-    return () => {
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-      if (socket) socket.close();
-    };
-  }, [sessionId, activeProjectId]);
+    return () => { dead = true; clearTimeout(timer); socket?.close(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProjectId]);
 
+  // ── Message handler ─────────────────────────────────────────────
   const handleMessage = (data) => {
+    const pid = activeProjectRef.current;
     switch (data.type) {
       case 'session':
-        if (!sessionId) {
+        if (data.session_id) {
           setSessionId(data.session_id);
-          localStorage.setItem('cmas_session_id', data.session_id);
+          const currentPid = activeProjectRef.current;
+          if (currentPid) storeSessionForProject(currentPid, data.session_id);
         }
-        break;
-      case 'session_list':
-        setSessions(data.sessions || []);
         break;
       case 'history':
         setMessages((data.messages || []).map(m => ({ role: m.role, text: m.content })));
         break;
-      case 'roster_init':
+      case 'roster_init': {
         const r = {};
         (data.agents || []).forEach(a => { r[a.name] = a; });
         setRoster(r);
         break;
+      }
       case 'agent_status':
         setRoster(prev => ({
           ...prev,
-          [data.agent]: { ...prev[data.agent], name: data.agent, status: data.status, current_task: data.task }
+          [data.agent]: {
+            ...prev[data.agent],
+            name: data.agent, status: data.status, current_task: data.task,
+            project_id: data.project_id || prev[data.agent]?.project_id || '',
+            updated_at: Date.now() / 1000,
+          }
         }));
         break;
+      case 'task_update':
+        setTasks(prev => {
+          const idx = prev.findIndex(t => t.id === data.task.id);
+          if (idx >= 0) { const n = [...prev]; n[idx] = data.task; return n; }
+          return [data.task, ...prev];
+        });
+        break;
+      case 'task_list':  setTasks(data.tasks || []); break;
       case 'trace':
         setTraces(prev => ({
           ...prev,
-          [data.agent]: [{ type: data.step_type, content: data.content, ts: data.ts }, ...(prev[data.agent] || [])].slice(0, 30)
+          [data.agent]: [
+            { type: data.step_type, content: data.content, ts: data.ts },
+            ...(prev[data.agent] || [])
+          ].slice(0, 50)
         }));
-        setTelemetry(prev => [{ ...data, id: Date.now() + Math.random() }, ...prev].slice(0, 50));
         break;
-      case 'comm':
-        setComms(prev => [{ ...data, id: Date.now() + Math.random() }, ...prev].slice(0, 10));
+      case 'telemetry':
+        if (!data.project_id || data.project_id === pid)
+          setTelemetry(prev => [{ ...data, id: Date.now() + Math.random() }, ...prev].slice(0, 300));
+        break;
+      case 'typing':   setIsTyping(data.status); break;
+      case 'progress': {
+        const agent = data.agent || '';
+        const text  = data.text  || '';
+        // Always update the live activity strip (per-agent, replaces in-place)
+        setLiveProgress(prev => ({ ...prev, [agent || '_']: text }));
+        // Only bubble milestone events into the chat log
+        const isMilestone = /complet|synthes|starting|deploying|spawning|failed|done\b|report|task queue/i.test(text);
+        if (isMilestone) {
+          setMessages(prev => [...prev, { role: 'progress', text, agent }]);
+        }
+        break;
+      }
+      case 'project_created':
+        setProjects(prev => [data, ...prev]);
+        selectProject(data.id);
+        break;
+      case 'project_renamed':
+        setProjects(prev => prev.map(p => p.id === data.project_id ? { ...p, name: data.name } : p));
+        break;
+      case 'project_deleted':
+        setProjects(prev => prev.filter(p => p.id !== data.project_id));
+        if (activeProjectRef.current === data.project_id) {
+          setActiveProjectId('');
+          localStorage.removeItem('cmas_project_id');
+          setMessages([]); setLiveProgress({}); setTasks([]); setRoster({});
+        }
+        break;
+      case 'project_stopped':
+        // Tasks will update via task_update broadcasts
         break;
       case 'message':
       case 'proactive':
+        setMessages(prev => [...prev, { role: 'assistant', text: data.text }]);
+        setIsTyping(false);
+        break;
       case 'error':
-        setMessages(prev => [...prev, { role: data.type === 'error' ? 'system' : 'assistant', text: data.text }]);
+        setMessages(prev => [...prev, { role: 'system', text: data.text }]);
+        setIsTyping(false);
         break;
     }
   };
 
-  const sendMessage = (type = 'chat', customText = null) => {
-    const text = customText !== null ? customText : input.trim();
-    if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
-    if (type !== 'steer') setMessages(prev => [...prev, { role: 'user', text }]);
-    ws.send(JSON.stringify({ type, text, project_id: activeProjectId }));
-    if (customText === null) setInput('');
+  // ── Actions ─────────────────────────────────────────────────────
+  const sendMessage = (e) => {
+    e?.preventDefault();
+    const text = input.trim();
+    if (!text || !ws || ws.readyState !== WebSocket.OPEN || !activeProjectId) return;
+    setMessages(prev => [...prev, { role: 'user', text }]);
+    ws.send(JSON.stringify({ type: 'chat', text, project_id: activeProjectId }));
+    setInput('');
   };
 
-  const createNewProject = () => {
-    const name = prompt("Mission Name (e.g. Neo-Luddite Risk Assessment):");
-    if (!name) return;
-    ws.send(JSON.stringify({ type: 'create_project', name, focus: 'Primary Mission' }));
-    setTimeout(loadProjects, 500);
-  };
-
-  const createNewSession = () => {
-    localStorage.removeItem('cmas_session_id');
-    setSessionId('');
-    setMessages([]);
-    setTraces({});
+  const wsAction = (type, extra = {}) => {
+    if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type, ...extra }));
   };
 
   const selectProject = (pid) => {
-    setActiveProjectId(pid);
     localStorage.setItem('cmas_project_id', pid);
-    setSessionId('');
-    setMessages([]);
-    setRoster({});
-    setTraces({});
-    loadProjects();
+    setActiveProjectId(pid);
+    setSessionId(getSessionForProject(pid));
+    setMessages([]); setLiveProgress({}); setTraces({}); setTasks([]); setTelemetry([]); setRoster({});
   };
 
-  // Swarm Interaction Map logic
-  const agentPositions = useMemo(() => {
-    const names = Object.keys(roster);
-    const pos = {};
-    names.forEach((name, i) => {
-      const angle = (i / names.length) * 2 * Math.PI;
-      pos[name] = { x: 50 + 35 * Math.cos(angle), y: 50 + 35 * Math.sin(angle) };
-    });
-    return pos;
-  }, [roster]);
+  const createChat = () => {
+    if (ws?.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: 'create_project', name: 'New Chat', focus: '' }));
+  };
 
-  const renderFileNode = (node, depth = 0) => (
-    <div key={node.path} style={{ paddingLeft: `${depth * 12}px` }}>
-      <div 
-        onClick={() => node.type === 'file' ? loadFileContent(node.path) : null}
-        className={`flex items-center gap-2 p-1.5 hover:bg-white/5 rounded-md cursor-pointer transition-all ${selectedFile === node.path ? 'bg-blue-600/20 text-blue-400 font-bold' : 'text-slate-500'}`}
-      >
-        {node.type === 'directory' ? <LayersIcon className="w-3.5 h-3.5 opacity-40" /> : <DatabaseIcon className="w-3.5 h-3.5 opacity-40" />}
-        <span className="text-[11px] truncate uppercase tracking-tight font-black">{node.name}</span>
-      </div>
-      {node.children && node.children.map(child => renderFileNode(child, depth + 1))}
-    </div>
-  );
+  const deleteProject = (pid) => {
+    if (ws?.readyState === WebSocket.OPEN)
+      ws.send(JSON.stringify({ type: 'delete_project', project_id: pid }));
+  };
+
+  const stopProject = (pid) => {
+    if (ws?.readyState === WebSocket.OPEN)
+      ws.send(JSON.stringify({ type: 'stop_project', project_id: pid }));
+  };
+
+  const renameProject = (pid, name) => {
+    if (ws?.readyState === WebSocket.OPEN && name.trim())
+      ws.send(JSON.stringify({ type: 'rename_project', project_id: pid, name: name.trim() }));
+  };
+
+  const injectSteer = (text) => {
+    if (ws?.readyState === WebSocket.OPEN && text.trim())
+      ws.send(JSON.stringify({ type: 'steer', text: text.trim() }));
+  };
+
+  // ── Derived ─────────────────────────────────────────────────────
+  const activeProject = projects.find(p => p.id === activeProjectId);
+  const allAgents     = Object.values(roster);
+  const projectAgents = allAgents.filter(a => a.project_id === activeProjectId);
+  const activeAgents  = projectAgents.filter(a => a.status === 'working').length;
+  const projectTasks  = tasks.filter(t => t.project_id === activeProjectId);
+  const activeTasks   = projectTasks.filter(t => t.status === 'in_progress').length;
+
+  // Right panel only makes sense in chat tab
+  const showRightPanel = activeTab === 'chat';
 
   return (
-    <div className="flex h-screen bg-[#050505] text-slate-100 overflow-hidden font-sans selection:bg-blue-500/30">
-      
-      {/* ── Minimalist Sidebar ────────────────────────────────────── */}
-      <aside className={`flex flex-col border-r border-white/5 bg-[#0a0a0b] transition-all duration-500 ease-in-out ${isSidebarOpen ? 'w-80' : 'w-0 overflow-hidden opacity-0 shadow-none'}`}>
-        <div className="p-8 border-b border-white/5">
-           <div className="flex items-center gap-4 mb-8">
-              <div className="w-12 h-12 rounded-[22px] bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-[0_10px_30px_rgba(37,99,235,0.2)] rotate-2">
-                <SparklesIcon className="w-7 h-7 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h1 className="text-xl font-black tracking-tighter text-white uppercase italic leading-none truncate">CMAS <span className="text-blue-500">Core</span></h1>
-                <div className="flex items-center gap-2 mt-1">
-                   <div className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-                   <span className="text-[10px] text-slate-500 uppercase font-black tracking-widest">{connected ? 'Live Swarm' : 'No Signal'}</span>
-                </div>
-              </div>
-           </div>
-           
-           <button 
-             onClick={createNewSession}
-             className="w-full py-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 flex items-center justify-center gap-3 transition-all group"
-           >
-              <PlusIcon className="w-5 h-5 text-slate-400 group-hover:text-blue-400 transition-colors" />
-              <span className="text-[13px] font-black uppercase tracking-widest text-slate-400">New Mission</span>
-           </button>
+    <div className="flex h-screen bg-zinc-950 text-zinc-100 overflow-hidden">
+
+      {/* ── Sidebar ── */}
+      <aside className="w-52 flex flex-col border-r border-zinc-800 shrink-0">
+        <div className="px-4 h-12 flex items-center gap-2.5 border-b border-zinc-800">
+          <div className="w-6 h-6 rounded-md bg-zinc-800 border border-zinc-700 flex items-center justify-center">
+            <Zap className="w-3.5 h-3.5 text-zinc-300" />
+          </div>
+          <span className="text-sm font-semibold text-zinc-100 tracking-tight">CMAS</span>
+          <div className={`ml-auto w-1.5 h-1.5 rounded-full ${connected ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`}
+            title={connected ? 'Connected' : 'Reconnecting'} />
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-8 space-y-10 custom-scrollbar">
-           <div>
-              <div className="flex items-center justify-between mb-4 px-2">
-                <span className="text-[10px] font-black text-slate-700 uppercase tracking-[0.2em] italic">Intelligence Clusters</span>
-                <button onClick={createNewProject} className="text-blue-500 p-1 rounded-lg"><PlusIcon className="w-4 h-4" /></button>
-              </div>
-              <div className="space-y-1.5">
-                 {projects.map(p => (
-                   <button 
-                     key={p.id} onClick={() => selectProject(p.id)}
-                     className={`w-full text-left px-5 py-4 rounded-3xl text-xs transition-all border ${p.id === activeProjectId ? 'bg-blue-600 text-white shadow-2xl shadow-blue-900/30' : 'border-transparent text-slate-400 hover:bg-white/5'}`}
-                   >
-                     <div className="font-black uppercase tracking-tight text-[12px] truncate">{p.name}</div>
-                     <div className={`text-[9px] font-bold uppercase tracking-widest mt-1 opacity-50 ${p.id === activeProjectId ? 'text-blue-200' : 'text-slate-600'}`}>{p.focus || 'Cluster v5.9'}</div>
-                   </button>
-                 ))}
-              </div>
-           </div>
+        <div className="px-3 pt-3 pb-1">
+          <button onClick={createChat} disabled={!connected}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer">
+            <Plus className="w-3.5 h-3.5" />
+            New Chat
+          </button>
+        </div>
 
-           <div>
-              <div className="flex items-center justify-between mb-4 px-2">
-                <span className="text-[10px] font-black text-slate-700 uppercase tracking-[0.2em] italic">Session Logs</span>
-              </div>
-              <div className="space-y-1">
-                 {sessions.map(s => (
-                   <button 
-                     key={s.id} onClick={() => { setSessionId(s.id); localStorage.setItem('cmas_session_id', s.id); setMessages([]); }}
-                     className={`w-full text-left p-3 rounded-2xl text-[11px] transition-all border ${s.id === sessionId ? 'bg-slate-900 border-white/10 text-slate-200' : 'border-transparent text-slate-600 hover:text-slate-400'}`}
-                   >
-                     <div className="truncate font-bold italic tracking-tight">{s.summary || 'deployment_stream'}</div>
-                     <div className="text-[8px] font-mono opacity-20 mt-1">{new Date(s.last_active * 1000).toLocaleTimeString()}</div>
-                   </button>
-                 ))}
-              </div>
-           </div>
-        </div>
-        
-        <div className="p-8 border-t border-white/5 bg-[#0d0d0f]">
-           <button onClick={() => setIsAssetDrawerOpen(true)} className="w-full flex items-center gap-4 text-slate-400 hover:text-white transition-all">
-              <div className="p-2.5 bg-blue-600/10 rounded-xl text-blue-500"><ArchiveIcon className="w-5 h-5" /></div>
-              <span className="text-[12px] font-black uppercase tracking-widest">Project Assets</span>
-              <ChevronRightIcon className="w-4 h-4 ml-auto opacity-30" />
-           </button>
-        </div>
+        <ProjectList
+          projects={projects}
+          activeProjectId={activeProjectId}
+          onSelect={selectProject}
+          onDelete={deleteProject}
+          onStop={stopProject}
+          onRename={renameProject}
+        />
       </aside>
 
-      {/* ── Main Chat Interface ─────────────────────────────────────── */}
-      <main className="flex-1 flex flex-col relative overflow-hidden bg-[#050505]">
-        
-        {/* Floating Top Nav */}
-        <div className="absolute top-8 left-8 right-8 h-16 flex items-center justify-between z-[40]">
-           <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="w-12 h-12 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 text-slate-400 transition-all shadow-xl"
-              >
-                <LayoutGridIcon className="w-5 h-5" />
-              </button>
-              <div className="px-6 h-12 flex items-center gap-4 bg-[#0a0a0b]/80 backdrop-blur-xl rounded-2xl border border-white/5 shadow-2xl">
-                 <div className="flex -space-x-3">
-                    {Object.keys(roster).slice(0, 5).map((name, i) => (
-                      <div key={i} className={`w-8 h-8 rounded-full bg-slate-800 border-2 border-[#0a0a0b] flex items-center justify-center text-[10px] font-black text-blue-500 ${roster[name].status === 'working' ? 'ring-2 ring-emerald-500 animate-pulse' : ''}`}>
-                        {name[0]}
-                      </div>
-                    ))}
-                    {Object.keys(roster).length > 5 && <div className="w-8 h-8 rounded-full bg-slate-900 border-2 border-[#0a0a0b] flex items-center justify-center text-[10px] font-black text-slate-500">+{Object.keys(roster).length - 5}</div>}
-                 </div>
-                 <div className="w-[1px] h-4 bg-white/10" />
-                 <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">{Object.keys(roster).length} Intelligence Nodes Ready</span>
-              </div>
-           </div>
-           
-           <div className="flex items-center gap-4">
-              <div className="px-5 h-12 flex items-center justify-center bg-black/50 backdrop-blur-3xl rounded-2xl border border-white/5 shadow-2xl">
-                 <div className="flex items-center gap-3">
-                    <ActivityIcon className="w-4 h-4 text-blue-500" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white italic truncate max-w-[200px]">
-                      {activeProjectId ? projects.find(p=>p.id===activeProjectId)?.name : 'Awaiting Mission'}
-                    </span>
-                 </div>
-              </div>
-              <button className="w-12 h-12 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 text-slate-400 transition-all font-black text-xs uppercase shadow-xl">
-                 HUD
-              </button>
-           </div>
-        </div>
+      {/* ── Main ── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-        {/* The Swarm Visualizer Pulse (Background Overlay) */}
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden opacity-30 select-none">
-           <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
-              {/* Communication Lines */}
-              {comms.map(c => {
-                const start = agentPositions[c.from];
-                const end = agentPositions[c.to];
-                if (!start || !end) return null;
-                return (
-                  <g key={c.id}>
-                    <line x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke="rgba(59, 130, 246, 0.4)" strokeWidth="0.5" strokeDasharray="1,1" className="animate-pulse" />
-                    <circle r="0.8" fill="#3b82f6" className="animate-pulse">
-                       <animateMotion path={`M ${start.x} ${start.y} L ${end.x} ${end.y}`} dur="0.8s" repeatCount="1" />
-                    </circle>
-                  </g>
-                );
-              })}
-              
-              {/* Agent Nodes */}
-              {Object.keys(roster).map(name => {
-                const pos = agentPositions[name];
-                if (!pos) return null;
-                return (
-                  <g key={name} transform={`translate(${pos.x}, ${pos.y})`}>
-                     <circle r="1.5" fill={roster[name].status === 'working' ? '#10b981' : '#1e293b'} className={`${roster[name].status === 'working' ? 'animate-pulse' : ''}`} />
-                     <text y="-3" fontSize="1.5" textAnchor="middle" fill="rgba(255,255,255,0.2)" fontWeight="black" uppercase>{name}</text>
-                  </g>
-                );
-              })}
-           </svg>
-        </div>
-
-        {/* Chat Stream */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10">
-           <div className="max-w-4xl mx-auto px-10 pt-48 pb-64 space-y-16">
-              {messages.length === 0 && (
-                <div className="h-full flex flex-col items-center justify-center text-center space-y-8 animate-fade-in py-20 grayscale opacity-40">
-                   <div className="w-24 h-24 rounded-[40px] bg-slate-900 flex items-center justify-center shadow-inner border border-white/5">
-                      <MessageSquareIcon className="w-12 h-12 text-slate-700" />
-                   </div>
-                   <div className="space-y-4">
-                      <h2 className="text-4xl font-black italic uppercase tracking-tighter text-white uppercase italic">Commander Console</h2>
-                      <p className="text-sm font-bold text-slate-500 uppercase tracking-widest max-w-[300px] leading-loose">State-of-the-Art Multi-Agent Swarm Orchestration Interface</p>
-                   </div>
-                   <div className="flex gap-4">
-                      {["Market Analysis", "Code Review", "Risk Summary"].map(tag => (
-                        <button key={tag} onClick={() => setInput(prev => `${prev} ${tag}`.trim())} className="px-5 py-2.5 bg-white/5 hover:bg-blue-600/20 hover:text-blue-400 rounded-2xl border border-white/5 text-[10px] font-black uppercase tracking-widest transition-all">
-                          {tag}
-                        </button>
-                      ))}
-                   </div>
-                </div>
-              )}
-              
-              {messages.map((m, i) => (
-                <div key={i} className={`flex gap-8 group animate-fade-in ${m.role === 'user' ? 'justify-end' : ''}`}>
-                  {m.role !== 'user' && (
-                    <div className="w-12 h-12 rounded-3xl bg-[#0a0a0b] border border-white/10 flex items-center justify-center shadow-2xl shrink-0 group-hover:scale-110 transition-transform">
-                      {m.role === 'system' ? <ActivityIcon className="w-6 h-6 text-red-500" /> : <BotIcon className="w-7 h-7 text-blue-500" />}
-                    </div>
-                  )}
-                  <div className={`relative max-w-[75%] px-10 py-8 rounded-[40px] text-[16px] leading-[1.8] shadow-2xl border transition-all ${
-                    m.role === 'user' 
-                      ? 'bg-blue-600 border-blue-500 text-white rounded-tr-none shadow-[0_20px_50px_rgba(37,99,235,0.4)]' 
-                      : 'bg-[#0a0a0b]/80 backdrop-blur-md border-white/5 text-slate-200 rounded-tl-none ring-1 ring-white/5'
+        <header className="h-12 border-b border-zinc-800 flex items-center px-4 gap-1 shrink-0">
+          <nav className="flex items-center gap-0.5">
+            {TABS.map(({ key, label, Icon }) => {
+              const count  = key === 'agents' ? (activeAgents || null) : key === 'tasks' ? (activeTasks || null) : null;
+              const isActive = activeTab === key;
+              return (
+                <button key={key} onClick={() => setActiveTab(key)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-colors cursor-pointer ${
+                    isActive ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800/60'
                   }`}>
-                    {m.text.split('\n').map((line, j) => (
-                      <p key={j} className="mb-4 last:mb-0 selection:bg-white/20">{line}</p>
-                    ))}
-                    
-                    {/* Role Label */}
-                    <div className={`absolute -bottom-6 ${m.role === 'user' ? 'right-4' : 'left-4'} text-[9px] font-black uppercase tracking-[0.3em] opacity-30 group-hover:opacity-100 transition-opacity`}>
-                       {m.role} :: {new Date().toLocaleTimeString()}
-                    </div>
-                  </div>
-                  {m.role === 'user' && (
-                    <div className="w-12 h-12 rounded-3xl bg-blue-600 flex items-center justify-center shrink-0 text-white font-black text-xs uppercase shadow-2xl group-hover:scale-110 transition-transform italic">OP</div>
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                  {count != null && (
+                    <span className="text-[10px] font-mono text-emerald-500">{count}</span>
                   )}
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-           </div>
-        </div>
-
-        {/* Deep Command Bar */}
-        <div className="absolute bottom-10 left-0 right-0 z-[50] px-10 pointer-events-none">
-           <div className="max-w-4xl mx-auto flex items-end gap-6 p-4 bg-[#0a0a0b]/90 backdrop-blur-3xl rounded-[48px] border border-white/10 shadow-[0_40px_120px_rgba(0,0,0,0.9)] pointer-events-auto ring-1 ring-white/10 focus-within:ring-blue-500/30 transition-all">
-              <div className="flex-1 flex flex-col px-8 py-3">
-                 <div className="flex items-center gap-3 mb-2 opacity-30 focus-within:opacity-100 transition-opacity">
-                    <CommandIcon className="w-4 h-4 text-blue-500" />
-                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">{activeProjectId ? `Controlling Project` : 'No mission context selected'}</span>
-                 </div>
-                 <textarea 
-                   className="w-full bg-transparent text-white py-2 focus:outline-none text-[18px] max-h-48 min-h-[54px] custom-scrollbar placeholder:text-slate-800 placeholder:italic font-black tracking-tight leading-relaxed"
-                   placeholder={activeProjectId ? "Deploy swarm objective..." : "Select mission cluster..."}
-                   value={input} onChange={e => setInput(e.target.value)}
-                   disabled={!activeProjectId}
-                   onKeyDown={e => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                 />
-              </div>
-              <div className="flex gap-3 p-2">
-                 <button onClick={() => sendMessage('steer')} className="w-16 h-16 flex items-center justify-center bg-white/5 hover:bg-emerald-600/20 text-emerald-500 rounded-[32px] transition-all border border-white/5 shadow-2xl">
-                    <FastForwardIcon className="w-7 h-7" />
-                 </button>
-                 <button 
-                  onClick={() => sendMessage('chat')} 
-                  disabled={!activeProjectId}
-                  className={`w-16 h-16 flex items-center justify-center rounded-[32px] transition-all border-none ${activeProjectId ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_20px_50px_rgba(37,99,235,0.4)] hover:scale-105 active:scale-95' : 'bg-slate-900 text-slate-700 opacity-30'}`}
-                 >
-                    <SendIcon className="w-7 h-7" />
-                 </button>
-              </div>
-           </div>
-        </div>
-      </main>
-
-      {/* ── Asset Drawer (Slide Out) ──────────────────────────────── */}
-      <div className={`fixed inset-y-0 right-0 z-[100] bg-[#0d0d0f] border-l border-white/5 shadow-[-40px_0_100px_rgba(0,0,0,0.8)] transition-all duration-700 ease-[cubic-bezier(0.16, 1, 0.3, 1)] ${isAssetDrawerOpen ? 'w-[500px]' : 'w-0 overflow-hidden shadow-none'}`}>
-         <div className="h-full flex flex-col w-[500px]">
-             <div className="h-24 px-10 flex items-center justify-between border-b border-white/5">
-                <div className="flex items-center gap-6">
-                   <div className="p-3 bg-blue-600/20 rounded-2xl text-blue-500"><ArchiveIcon className="w-8 h-8" /></div>
-                   <h2 className="text-2xl font-black italic tracking-tighter text-white uppercase italic">Project Assets</h2>
-                </div>
-                <button onClick={() => setIsAssetDrawerOpen(false)} className="w-12 h-12 flex items-center justify-center bg-white/5 hover:bg-red-500/20 hover:text-red-400 rounded-full transition-all">
-                   <XIcon className="w-6 h-6" />
                 </button>
-             </div>
-             
-             <div className="flex-1 flex overflow-hidden">
-                <div className="w-1/3 border-r border-white/5 p-6 overflow-y-auto custom-scrollbar">
-                   <div className="flex items-center justify-between mb-8 px-2">
-                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest italic">Inventory</span>
-                      <SearchIcon className="w-4 h-4 text-slate-700" />
-                   </div>
-                   <div className="space-y-1">
-                      {fileTree.map(node => renderFileNode(node))}
-                   </div>
-                </div>
-                <div className="flex-1 bg-black overflow-hidden flex flex-col relative">
-                   {selectedFile ? (
-                     <>
-                        <div className="p-8 border-b border-white/5">
-                           <div className="text-[11px] font-mono text-slate-400 font-bold mb-1 truncate">{selectedFile.split('/').pop()}</div>
-                           <div className="text-[9px] text-slate-700 font-black uppercase tracking-widest font-mono truncate">{selectedFile}</div>
-                        </div>
-                        <div className="flex-1 overflow-auto p-10 font-mono text-[13px] text-slate-500 leading-relaxed custom-scrollbar selection:bg-blue-500/30">
-                           {isLoadingFile ? 'DECODING...' : <pre><code>{fileContent}</code></pre>}
-                        </div>
-                     </>
-                   ) : (
-                     <div className="flex-1 flex flex-col items-center justify-center opacity-10">
-                        <LockIcon className="w-24 h-24" />
-                     </div>
-                   )}
-                </div>
-             </div>
-         </div>
+              );
+            })}
+          </nav>
+
+          <div className="flex-1" />
+
+          <div className="flex items-center gap-3 text-xs text-zinc-600">
+            {activeProject && (
+              <span className="text-zinc-400 truncate max-w-[200px]">{activeProject.name}</span>
+            )}
+            {activeAgents > 0 && (
+              <>
+                <span className="flex items-center gap-1.5 text-emerald-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  {activeAgents} agent{activeAgents !== 1 ? 's' : ''} running
+                </span>
+                <button onClick={() => stopProject(activeProjectId)}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-md text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer border border-red-500/20 hover:border-red-500/40">
+                  <StopCircle className="w-3 h-3" /> Stop All
+                </button>
+              </>
+            )}
+          </div>
+        </header>
+
+        {/* Content + right panel */}
+        <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {activeTab === 'chat' && (
+              <ChatView messages={messages} isTyping={isTyping} input={input}
+                setInput={setInput} sendMessage={sendMessage} activeProject={activeProject}
+                connected={connected} projectAgents={projectAgents} liveProgress={liveProgress}
+                onSteer={injectSteer} />
+            )}
+            {activeTab === 'agents' && (
+              <AgentsView roster={roster} activeProjectId={activeProjectId}
+                onInspect={setInspectAgent} wsAction={wsAction} />
+            )}
+            {activeTab === 'tasks' && (
+              <TasksView tasks={tasks} activeProjectId={activeProjectId} wsAction={wsAction} />
+            )}
+            {activeTab === 'logs' && <LogsView telemetry={telemetry} />}
+          </div>
+
+          {/* Right panel — chat tab only */}
+          {showRightPanel && (
+            <RightPanel
+              projectAgents={projectAgents}
+              projectTasks={projectTasks}
+              liveProgress={liveProgress}
+              isOpen={rightPanelOpen}
+              onToggle={() => setRightPanelOpen(o => !o)}
+            />
+          )}
+        </div>
       </div>
 
-      {/* ── Global Flux Feed (Pinned Terminal) ────────────────────── */}
-      <footer className="h-12 absolute bottom-0 left-0 right-0 bg-black/40 backdrop-blur-xl border-t border-white/5 flex items-center px-10 z-[60] pointer-events-none select-none opacity-40">
-         <div className="flex-1 flex items-center gap-12 overflow-hidden">
-            <div className="flex items-center gap-2">
-               <TermIcon className="w-4 h-4 text-blue-500" />
-               <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Global Telemetry Flux</span>
-            </div>
-            <div className="flex-1 flex gap-8 whitespace-nowrap overflow-hidden items-center group">
-               {telemetry.slice(0, 5).map(log => (
-                 <div key={log.id} className="text-[9px] font-mono flex items-center gap-2">
-                    <span className="text-blue-500 font-bold">[{log.agent}]</span> 
-                    <span className="text-slate-500 italic">{log.tool} :: {log.result?.slice(0, 30)}</span>
-                    <span className="text-slate-800">::</span>
-                 </div>
-               ))}
-            </div>
-         </div>
-         <div className="text-[9px] font-black text-slate-800 tracking-[0.4em] uppercase">Core Rev 42.1</div>
-      </footer>
-
-      {/* ── Simple Inspection Modal (Clean) ───────────────────────── */}
       {inspectAgent && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-24 bg-black/95 backdrop-blur-3xl animate-fade-in">
-           <div className="w-full max-w-4xl h-full bg-[#0a0a0b] border border-white/10 rounded-[64px] shadow-[0_0_120px_rgba(0,0,0,1)] overflow-hidden flex flex-col border-b-[8px] border-b-blue-600">
-              <div className="h-24 px-12 flex items-center justify-between border-b border-white/5 bg-black">
-                 <div className="flex items-center gap-8">
-                    <div className="w-14 h-14 bg-blue-600 rounded-3xl flex items-center justify-center shadow-xl shadow-blue-900/40"><BotIcon className="w-8 h-8 text-white" /></div>
-                    <div className="text-2xl font-black italic tracking-tighter text-white uppercase italic">INSPECT: {inspectAgent}</div>
-                 </div>
-                 <button onClick={() => setInspectAgent(null)} className="w-14 h-14 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-full transition-all">
-                    <XIcon className="w-7 h-7" />
-                 </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-16 custom-scrollbar space-y-12">
-                 {(traces[inspectAgent] || []).map((t, idx) => (
-                   <div key={idx} className="flex gap-10 items-start">
-                      <div className="w-3 h-3 rounded-full mt-2 shrink-0 bg-blue-600 shadow-[0_0_15px_blue]" />
-                      <div className="flex-1">
-                         <div className="flex items-center gap-4 mb-4 opacity-50">
-                            <span className="text-[11px] font-black text-slate-400 tracking-widest">{t.ts}</span>
-                            <span className="text-[10px] font-bold uppercase tracking-widest">{t.type}</span>
-                         </div>
-                         <div className="p-10 bg-black/40 rounded-[50px] border border-white/5 text-[16px] text-slate-400 leading-relaxed font-sans whitespace-pre-wrap">
-                            {t.content}
-                         </div>
-                      </div>
-                   </div>
-                 ))}
-              </div>
-           </div>
-        </div>
+        <AgentModal agent={inspectAgent} agentData={roster[inspectAgent]}
+          traces={traces[inspectAgent]} onClose={() => setInspectAgent(null)} />
       )}
 
-      <style dangerouslySetInnerHTML={{ __html: `
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.2); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(59, 130, 246, 0.4); }
-        @keyframes fade-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-      `}} />
-
+      <style>{`
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+        * { scrollbar-width: thin; scrollbar-color: #3f3f46 transparent; }
+      `}</style>
     </div>
   );
 }

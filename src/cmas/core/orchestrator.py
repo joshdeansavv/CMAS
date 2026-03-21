@@ -58,10 +58,17 @@ class Orchestrator:
         max_concurrent_agents: int = 4,
         human_in_the_loop: bool = False,
         local_timezone: Optional[str] = None,
+        hub: Optional[Hub] = None,
+        gateway: Optional[Gateway] = None,
+        memory: Optional[Memory] = None,
+        project_id: str = "",
+        progress_callback=None,
     ):
         self.project_dir = project_dir
         self.project_dir.mkdir(parents=True, exist_ok=True)
-        self.hub = Hub(project_dir)
+        self.hub = hub or Hub(project_dir)
+        self.project_id = project_id
+        self.progress_callback = progress_callback
         self.model = model
         self.agent_model = agent_model
         self.max_iterations = max_iterations
@@ -70,10 +77,10 @@ class Orchestrator:
         self.local_timezone = local_timezone or os.getenv("CMAS_TIMEZONE")
         self.agents: Dict[str, Agent] = {}
 
-        # Cognitive modules
-        self.gateway = Gateway(hub=self.hub, project_dir=project_dir,
+        # Cognitive modules — reuse injected instances or create new ones
+        self.gateway = gateway or Gateway(hub=self.hub, project_dir=project_dir,
                                rate_limit_calls=30, rate_limit_window=60.0, max_recursion_depth=15)
-        self.memory = Memory()
+        self.memory = memory or Memory()
         self.evaluator = Evaluator(hub=self.hub, model=self.model)
         self.reasoner = Reasoner(model=self.model)
         self.metacognition = MetaCognition(hub=self.hub, memory=self.memory, model=self.model)
@@ -104,6 +111,14 @@ class Orchestrator:
 
     def _print(self, msg: str):
         print(f"[Orchestrator] {msg}")
+
+    async def _emit(self, text: str, agent: str = "Orchestrator"):
+        """Push a progress event to the active chat session."""
+        if self.progress_callback:
+            try:
+                await self.progress_callback(text, agent)
+            except Exception:
+                pass
 
     # ── Human-in-the-Loop ────────────────────────────────────────
 
@@ -175,15 +190,15 @@ Return JSON ONLY:
             # Auto-install missing packages using a shell agent
             task_id = "prescreen_pip"
             task_desc = f"Ensure the following Python packages are installed via pip: {', '.join(deps)}"
-            t = Task(id=task_id, description=task_desc, status=TaskStatus.PENDING)
+            t = Task(id=task_id, description=task_desc, status=TaskStatus.PENDING, project_id=self.project_id)
             self.hub.add_task(t)
             self._task_agent_map[task_id] = "specialist:Developer"
             self._task_deps[task_id] = []
-            
+
         for i, dt in enumerate(dev_tasks):
             self._print(f"  Architect injecting prerequisite task: {dt}")
             task_id = f"prescreen_dev_{i}"
-            t = Task(id=task_id, description=f"PRE-REQUISITE: {dt}", status=TaskStatus.PENDING)
+            t = Task(id=task_id, description=f"PRE-REQUISITE: {dt}", status=TaskStatus.PENDING, project_id=self.project_id)
             self.hub.add_task(t)
             self._task_agent_map[task_id] = "specialist:Developer"
             self._task_deps[task_id] = ["prescreen_pip"] if deps else []
@@ -327,7 +342,7 @@ Return ONLY the JSON array."""},
 
         tasks = []
         for td in tasks_data:
-            task = Task(id=td["id"], description=td["description"], status=TaskStatus.PENDING)
+            task = Task(id=td["id"], description=td["description"], status=TaskStatus.PENDING, project_id=self.project_id)
             self.hub.add_task(task)
             tasks.append(task)
             self._print(f"  Task: [{td['id']}] {td['description'][:80]}...")
@@ -345,6 +360,11 @@ Return ONLY the JSON array."""},
 
         self.hub.remember("goal", goal)
         self.hub.remember("task_plan", json.dumps(tasks_data, indent=2))
+
+        # Emit plan to chat — agent names are determined at execution time, not here
+        for td in tasks_data:
+            agent_type = td.get("agent_type", "research")
+            await self._emit(f"Task queued [{agent_type}]: {td['description'][:90]}", "Orchestrator")
 
         # Human checkpoint
         human_input = await self._human_checkpoint(
@@ -365,7 +385,8 @@ Return ONLY the JSON array."""},
 
         workspace = self.project_dir / "agents"
         kwargs = dict(hub=self.hub, workspace=workspace, model=self.agent_model,
-                      gateway=self.gateway, memory=self.memory)
+                      gateway=self.gateway, memory=self.memory,
+                      progress_callback=self.progress_callback)
 
         if agent_type == "research":
             agent = create_research_agent(**kwargs)
@@ -415,6 +436,7 @@ Return ONLY the JSON array."""},
         async def run_one(task: Task):
             agent_type = self._task_agent_map.get(task.id, "research")
             agent = self._get_or_create_agent(agent_type)
+            await self._emit(f"Starting: {task.description[:80]}", agent.name)
 
             deps = self._task_deps.get(task.id, [])
             if deps:
@@ -424,9 +446,12 @@ Return ONLY the JSON array."""},
                         dep_context += f"\n[{dep_id}]: {context_results[dep_id]}\n"
                 task_with_context = Task(
                     id=task.id, description=task.description + dep_context,
-                    status=task.status, parent_task_id=task.parent_task_id)
-                return await agent.execute(task_with_context)
-            return await agent.execute(task)
+                    status=task.status, parent_task_id=task.parent_task_id,
+                    project_id=self.project_id)
+                result = await agent.execute(task_with_context)
+            else:
+                result = await agent.execute(task)
+            return result
 
         sem = asyncio.Semaphore(self.max_concurrent)
         async def bounded(task):
@@ -476,7 +501,7 @@ Return ONLY the JSON array."""},
                 f"Original: {original_task.description[:200]}. "
                 f"Address the feedback specifically. Try a different approach."
             )
-            retry_task = Task(id=retry_id, description=retry_desc)
+            retry_task = Task(id=retry_id, description=retry_desc, project_id=self.project_id)
             self.hub.add_task(retry_task)
             original_type = self._task_agent_map.get(s.task_id, "research")
             self._task_agent_map[retry_id] = original_type
@@ -603,7 +628,7 @@ Return ONLY JSON. Limit to 1-3 high-impact tasks."""},
         self._print(f"Gaps: {review.get('gaps', 'N/A')}")
         new_tasks = []
         for td in review.get("new_tasks", []):
-            task = Task(id=td["id"], description=td["description"])
+            task = Task(id=td["id"], description=td["description"], project_id=self.project_id)
             self.hub.add_task(task)
             self._task_agent_map[td["id"]] = td.get("agent_type", "research")
             self._task_deps[td["id"]] = td.get("depends_on", [])
@@ -628,6 +653,7 @@ Return ONLY JSON. Limit to 1-3 high-impact tasks."""},
             f"## {t.id}: {t.description[:100]}\n{t.result}" for t in done_tasks
         )
         self._print("Synthesizing final output...")
+        await self._emit("Synthesizing all agent findings into final report…", "Orchestrator")
 
         current_date = self._get_current_date()
 
@@ -677,12 +703,15 @@ IMPORTANT RULES:
         self._task_deps = {}
 
         # Phase -1: PRE-SCREENING
+        await self._emit("Pre-screening goal for dependencies and constraints…", "Orchestrator")
         augmented_goal = await self._prescreen_goal(goal)
 
         # Phase 0: PERCEIVE
+        await self._emit("Running MCTS reasoning analysis…", "Orchestrator")
         perception = await self._perceive(augmented_goal)
 
         # Phase 1: PLAN
+        await self._emit("Decomposing goal into agent task pipeline…", "Orchestrator")
         tasks = await self.decompose_goal(augmented_goal, perception)
 
         # Phases 2-5: Execute -> Evaluate -> Reflect -> Iterate
@@ -702,6 +731,7 @@ IMPORTANT RULES:
             print(self.hub.get_status_summary())
 
             # EVALUATE
+            await self._emit(f"Evaluating agent outputs (iteration {iteration})…", "Orchestrator")
             await self._evaluate_and_retry(goal)
 
             # Execute retries
@@ -713,6 +743,7 @@ IMPORTANT RULES:
                 await self._run_tasks_batch(ready)
 
             # REFLECT
+            await self._emit("Running metacognitive reflection…", "Orchestrator")
             reflection = await self._reflect_and_adapt(goal, iteration)
 
             # ITERATE

@@ -15,6 +15,7 @@ class Session:
     session_id: str
     user_id: str
     channel: str = "web"
+    project_id: str = ""
     created_at: float = field(default_factory=time.time)
     last_active: float = field(default_factory=time.time)
     context_summary: str = ""
@@ -54,6 +55,7 @@ class SessionManager:
             CREATE TABLE IF NOT EXISTS sessions (
                 session_id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
+                project_id TEXT DEFAULT '',
                 channel TEXT NOT NULL DEFAULT 'web',
                 created_at REAL,
                 last_active REAL,
@@ -77,9 +79,21 @@ class SessionManager:
         """)
         conn.commit()
 
+        # Migrations for existing DBs
+        for migration in [
+            "ALTER TABLE sessions ADD COLUMN project_id TEXT DEFAULT ''",
+        ]:
+            try:
+                conn.execute(migration)
+                conn.commit()
+            except Exception:
+                pass
+
     # ── Sessions ──────────────────────────────────────────────────
 
-    def get_or_create(self, session_id: str, user_id: str, channel: str = "web") -> Session:
+    def get_or_create(
+        self, session_id: str, user_id: str, channel: str = "web", project_id: str = ""
+    ) -> Session:
         conn = self._conn()
         row = conn.execute(
             "SELECT * FROM sessions WHERE session_id = ?", (session_id,)
@@ -93,6 +107,7 @@ class SessionManager:
             return Session(
                 session_id=row["session_id"],
                 user_id=row["user_id"],
+                project_id=row["project_id"] if "project_id" in row.keys() else project_id,
                 channel=row["channel"],
                 created_at=row["created_at"],
                 last_active=time.time(),
@@ -100,12 +115,15 @@ class SessionManager:
             )
         now = time.time()
         conn.execute(
-            "INSERT INTO sessions (session_id, user_id, channel, created_at, last_active) VALUES (?,?,?,?,?)",
-            (session_id, user_id, channel, now, now),
+            "INSERT INTO sessions (session_id, user_id, project_id, channel, created_at, last_active) "
+            "VALUES (?,?,?,?,?,?)",
+            (session_id, user_id, project_id, channel, now, now),
         )
         conn.commit()
-        return Session(session_id=session_id, user_id=user_id, channel=channel,
-                       created_at=now, last_active=now)
+        return Session(
+            session_id=session_id, user_id=user_id, project_id=project_id,
+            channel=channel, created_at=now, last_active=now,
+        )
 
     def update_summary(self, session_id: str, summary: str):
         conn = self._conn()
@@ -127,7 +145,19 @@ class SessionManager:
                 "SELECT * FROM sessions ORDER BY last_active DESC LIMIT ?",
                 (limit,),
             ).fetchall()
-        return [Session(**{k: r[k] for k in r.keys()}) for r in rows]
+        result = []
+        for r in rows:
+            keys = r.keys()
+            result.append(Session(
+                session_id=r["session_id"],
+                user_id=r["user_id"],
+                project_id=r["project_id"] if "project_id" in keys else "",
+                channel=r["channel"],
+                created_at=r["created_at"],
+                last_active=r["last_active"],
+                context_summary=r["context_summary"] or "",
+            ))
+        return result
 
     # ── Conversation History ──────────────────────────────────────
 
@@ -150,7 +180,6 @@ class SessionManager:
             "ORDER BY timestamp DESC LIMIT ?",
             (session_id, limit),
         ).fetchall()
-        # Reverse to chronological order
         return [{"role": r["role"], "content": r["content"]} for r in reversed(rows)]
 
     def get_full_history(self, session_id: str, limit: int = 500) -> List[Dict]:

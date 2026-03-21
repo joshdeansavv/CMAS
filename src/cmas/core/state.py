@@ -17,6 +17,9 @@ class TaskStatus(str, Enum):
     DONE = "done"
     FAILED = "failed"
     BLOCKED = "blocked"
+    PAUSED = "paused"
+    KILLED = "killed"
+    COMPLETED = "completed"
 
 
 @dataclass
@@ -26,6 +29,7 @@ class Task:
     assigned_to: str = ""
     status: TaskStatus = TaskStatus.PENDING
     project_id: str = ""
+    source_channel: str = "web"
     result: str = ""
     parent_task_id: str = ""
     created_at: float = field(default_factory=time.time)
@@ -46,6 +50,7 @@ class Hub:
         self.db_path = self.project_dir / "hub.db"
         self._local = threading.local()
         self.on_status_change = None
+        self.on_task_change = None
         self.on_message = None
         self._init_db()
 
@@ -71,6 +76,7 @@ class Hub:
                 assigned_to TEXT DEFAULT '',
                 status TEXT DEFAULT 'pending',
                 project_id TEXT DEFAULT '',
+                source_channel TEXT DEFAULT 'web',
                 result TEXT DEFAULT '',
                 parent_task_id TEXT DEFAULT '',
                 created_at REAL,
@@ -92,59 +98,44 @@ class Hub:
                 name TEXT PRIMARY KEY,
                 status TEXT DEFAULT 'idle',
                 current_task TEXT DEFAULT '',
+                project_id TEXT DEFAULT '',
+                source_channel TEXT DEFAULT 'web',
                 updated_at REAL
             );
 
-            CREATE TABLE IF NOT EXISTS conversations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                channel TEXT NOT NULL DEFAULT 'web',
-                role TEXT NOT NULL,
-                content TEXT NOT NULL,
-                timestamp REAL,
-                metadata TEXT DEFAULT '{}'
-            );
-            CREATE INDEX IF NOT EXISTS idx_conv_session
-                ON conversations(session_id, timestamp);
-
-            CREATE TABLE IF NOT EXISTS sessions (
-                session_id TEXT PRIMARY KEY,
-                user_id TEXT NOT NULL,
-                project_id TEXT DEFAULT '',
-                channel TEXT NOT NULL DEFAULT 'web',
-                created_at REAL,
-                last_active REAL,
-                context_summary TEXT DEFAULT ''
-            );
-
-            CREATE TABLE IF NOT EXISTS scheduled_jobs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                job_type TEXT NOT NULL,
-                description TEXT NOT NULL DEFAULT '',
-                schedule TEXT NOT NULL,
-                action TEXT NOT NULL DEFAULT '{}',
-                session_id TEXT,
-                user_id TEXT DEFAULT '',
-                channel TEXT DEFAULT 'web',
-                enabled INTEGER DEFAULT 1,
-                last_run REAL DEFAULT 0,
-                next_run REAL,
-                created_at REAL
-            );
         """)
         conn.commit()
+
+        # Migrations for existing DBs
+        for migration in [
+            "ALTER TABLE tasks ADD COLUMN source_channel TEXT DEFAULT 'web'",
+            "ALTER TABLE agent_status ADD COLUMN project_id TEXT DEFAULT ''",
+            "ALTER TABLE agent_status ADD COLUMN source_channel TEXT DEFAULT 'web'",
+        ]:
+            try:
+                conn.execute(migration)
+                conn.commit()
+            except Exception:
+                pass
 
     # ── Tasks ────────────────────────────────────────────────────
 
     def add_task(self, task: Task):
         conn = self._get_conn()
         conn.execute(
-            "INSERT OR REPLACE INTO tasks VALUES (?,?,?,?,?,?,?,?,?)",
+            "INSERT OR REPLACE INTO tasks "
+            "(id, description, assigned_to, status, project_id, source_channel, result, parent_task_id, created_at, updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
             (task.id, task.description, task.assigned_to, task.status.value,
-             task.project_id, task.result, task.parent_task_id, task.created_at, task.updated_at),
+             task.project_id, task.source_channel, task.result,
+             task.parent_task_id, task.created_at, task.updated_at),
         )
         conn.commit()
+        if self.on_task_change:
+            try:
+                self.on_task_change(task.to_dict())
+            except Exception:
+                pass
 
     def update_task(self, task_id: str, **kwargs):
         conn = self._get_conn()
@@ -153,12 +144,31 @@ class Hub:
         vals = list(kwargs.values()) + [task_id]
         conn.execute(f"UPDATE tasks SET {sets} WHERE id = ?", vals)
         conn.commit()
+        if self.on_task_change:
+            try:
+                task = self.get_task(task_id)
+                if task:
+                    self.on_task_change(task.to_dict())
+            except Exception:
+                pass
 
     def get_task(self, task_id: str) -> Optional[Task]:
         conn = self._get_conn()
         row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
         if row:
-            return Task(**{k: row[k] for k in row.keys()})
+            keys = row.keys()
+            return Task(
+                id=row["id"],
+                description=row["description"],
+                assigned_to=row["assigned_to"],
+                status=TaskStatus(row["status"]),
+                project_id=row["project_id"],
+                source_channel=row["source_channel"] if "source_channel" in keys else "web",
+                result=row["result"],
+                parent_task_id=row["parent_task_id"],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+            )
         return None
 
     def get_tasks(self, status: Optional[str] = None, assigned_to: Optional[str] = None) -> List[Task]:
@@ -173,7 +183,22 @@ class Hub:
             params.append(assigned_to)
         query += " ORDER BY created_at"
         rows = conn.execute(query, params).fetchall()
-        return [Task(**{k: r[k] for k in r.keys()}) for r in rows]
+        tasks = []
+        for r in rows:
+            keys = r.keys()
+            tasks.append(Task(
+                id=r["id"],
+                description=r["description"],
+                assigned_to=r["assigned_to"],
+                status=TaskStatus(r["status"]) if r["status"] in TaskStatus._value2member_map_ else TaskStatus.FAILED,
+                project_id=r["project_id"],
+                source_channel=r["source_channel"] if "source_channel" in keys else "web",
+                result=r["result"],
+                parent_task_id=r["parent_task_id"],
+                created_at=r["created_at"],
+                updated_at=r["updated_at"],
+            ))
+        return tasks
 
     def get_all_tasks(self) -> List[Task]:
         return self.get_tasks()
@@ -227,11 +252,14 @@ class Hub:
 
     # ── Agent Status ─────────────────────────────────────────────
 
-    def set_agent_status(self, name: str, status: str, current_task: str = ""):
+    def set_agent_status(self, name: str, status: str, current_task: str = "",
+                         project_id: str = "", source_channel: str = "web"):
         conn = self._get_conn()
         conn.execute(
-            "INSERT OR REPLACE INTO agent_status (name, status, current_task, updated_at) VALUES (?,?,?,?)",
-            (name, status, current_task, time.time()),
+            "INSERT OR REPLACE INTO agent_status "
+            "(name, status, current_task, project_id, source_channel, updated_at) "
+            "VALUES (?,?,?,?,?,?)",
+            (name, status, current_task, project_id, source_channel, time.time()),
         )
         conn.commit()
         if self.on_status_change:
@@ -262,10 +290,51 @@ class Hub:
         rows = conn.execute("SELECT * FROM projects ORDER BY created_at DESC").fetchall()
         return [dict(r) for r in rows]
 
+    def rename_project(self, project_id: str, name: str):
+        conn = self._get_conn()
+        conn.execute("UPDATE projects SET name = ? WHERE id = ?", (name, project_id))
+        conn.commit()
+
+    def delete_project(self, project_id: str):
+        """Delete a project and all its associated tasks and agent statuses."""
+        conn = self._get_conn()
+        conn.execute("DELETE FROM tasks WHERE project_id = ?", (project_id,))
+        conn.execute("DELETE FROM agent_status WHERE project_id = ?", (project_id,))
+        conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+        conn.commit()
+
+    def stop_project_tasks(self, project_id: str):
+        """Mark all active tasks for a project as killed."""
+        conn = self._get_conn()
+        conn.execute(
+            "UPDATE tasks SET status = 'killed', updated_at = ? WHERE project_id = ? AND status IN ('pending','in_progress')",
+            (time.time(), project_id)
+        )
+        conn.execute(
+            "UPDATE agent_status SET status = 'idle', current_task = '', updated_at = ? WHERE project_id = ?",
+            (time.time(), project_id)
+        )
+        conn.commit()
+
     def get_project_tasks(self, project_id: str) -> List[Task]:
         conn = self._get_conn()
         rows = conn.execute("SELECT * FROM tasks WHERE project_id = ?", (project_id,)).fetchall()
-        return [Task(**{k: r[k] for k in r.keys()}) for r in rows]
+        tasks = []
+        for r in rows:
+            keys = r.keys()
+            tasks.append(Task(
+                id=r["id"],
+                description=r["description"],
+                assigned_to=r["assigned_to"],
+                status=TaskStatus(r["status"]) if r["status"] in TaskStatus._value2member_map_ else TaskStatus.FAILED,
+                project_id=r["project_id"],
+                source_channel=r["source_channel"] if "source_channel" in keys else "web",
+                result=r["result"],
+                parent_task_id=r["parent_task_id"],
+                created_at=r["created_at"],
+                updated_at=r["updated_at"],
+            ))
+        return tasks
 
     # ── Summary ──────────────────────────────────────────────────
 
