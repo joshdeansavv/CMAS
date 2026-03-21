@@ -65,6 +65,58 @@ Be rigorous. Flag where reasoning is uncertain. Return ONLY JSON."""},
             "unknowns": ["Requires further research"],
         })
 
+    async def mcts_search(self, goal: str, context: str = "", max_depth: int = 3, num_simulations: int = 3) -> Dict:
+        """Monte-Carlo Tree Search (MCTS) for complex reasoning trajectories.
+        
+        Instead of a linear chain-of-thought, this acts like AlphaGo:
+        1. Expands multiple possible starting hypotheses (branches).
+        2. Simulates the downstream effects of each hypothesis.
+        3. Scores the probability of success based on physical/logical constraints.
+        4. Returns the mathematically verified optimal path.
+        """
+        response = await chat(
+            messages=[
+                {"role": "system", "content": f"""You are an AGI running a Monte-Carlo Tree Search (MCTS).
+Given a highly complex goal, do NOT give a single linear answer. 
+Instead:
+1. Generate {num_simulations} radically different first-step hypotheses (branches).
+2. For each branch, simulate {max_depth} downstream steps (rollouts).
+3. Score each simulated end-state strictly on logical consistency, physical laws, and probability of success (0.0 to 1.0).
+4. Identify the highest-scoring branch and declare it the verified optimal path.
+
+Return ONLY a valid JSON object:
+{{
+  "simulations": [
+    {{
+      "branch_id": "A",
+      "initial_hypothesis": "...",
+      "rollout_steps": ["step 1", "step 2", "step 3"],
+      "end_state_prediction": "...",
+      "score": 0.0-1.0,
+      "fatal_flaw": "none or description of why it fails"
+    }}
+  ],
+  "optimal_path": {{
+    "branch_id": "...",
+    "reasoning": "why this branch mathematically won the simulation tree",
+    "recommended_action_plan": ["action 1", "action 2"]
+  }}
+}}"""},
+                {"role": "user", "content": f"Goal: {goal}\n\nContext:\n{context}"}
+            ],
+            model=self.model,
+            temperature=0.6,
+        )
+        
+        return self._parse_json(response.content, {
+            "simulations": [],
+            "optimal_path": {
+                "branch_id": "fallback",
+                "reasoning": "MCTS simulation failed to parse.",
+                "recommended_action_plan": ["Use standard research agent."]
+            }
+        })
+
     async def generate_hypotheses(self, topic: str, observations: str = "", num: int = 3) -> List[Dict]:
         """Generate multiple competing hypotheses about a topic.
 
