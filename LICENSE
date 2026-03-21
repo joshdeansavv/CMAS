@@ -1,24 +1,29 @@
-Copyright 2026 CMAS Contributors
+PolyForm Noncommercial License 1.0.0
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, subject to the following conditions:
+Copyright (c) 2026 CMAS Contributors and joshdeansavv
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This software is NOT open source. It is provided under a Source-Available model.
 
-NON-COMMERCIAL RESTRICTION (COMMONS CLAUSE)
-"Commercial Use" of the Software is strictly prohibited. Commercial Use means
-any use or distribution of the Software for a direct or indirect commercial or
-financial advantage, including but not limited to selling the Software, offering
-it as a paid Service (SaaS), or embedding it into a paid product. 
+< TERMS >
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+1. Grant of License
+Subject to the limitations set out below, the Licensor grants you a non-exclusive, royalty-free, worldwide license to:
+- Use, reproduce, display, and perform the Software in any environment.
+- Modify the Software and create derivative works.
+
+2. Noncommercial Restriction
+You may NOT use the Software (or any derivative work) for Commercial purposes. “Commercial purposes” means any use of the Software to generate revenue, directly or indirectly, including but not limited to:
+- Providing the Software as a paid Service (SaaS).
+- Embedding the Software in a commercial application or hardware product.
+- Using the Software to support the operations of a commercial entity.
+
+3. Personal and Academic Use
+You MAY use the Software for personal, non-commercial research, academic study, and hobbyist software development. 
+
+4. Redistribution
+You may distribute verbatim copies of this Software to third parties, provided you include this license and copyright notice. You may NOT distribute the Software for any commercial advantage.
+
+5. Disclaimer of Warranty
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITH ALL FAULTS, WITHOUT WARRANTY OF ANY KIND. THE LICENSOR EXPRESSLY DISCLAIMS ALL WARRANTIES, WHETHER EXPRESS, IMPLIED, STATUTORY OR OTHERWISE.
+
+If you wish to use this software for commercial purposes, you must negotiate a separate commercial license with the Copyright Holder.

@@ -3,7 +3,7 @@
   <h3>An autonomous, steerable agentic framework powered by cognitive architecture.</h3>
 
   <p>
-    <a href="#"><img alt="License" src="https://img.shields.io/badge/License-Non--Commercial-blue.svg"></a>
+    <a href="#"><img alt="License" src="https://img.shields.io/badge/License-PolyForm%20Noncommercial%20(Proprietary)-red.svg"></a>
     <a href="#"><img alt="Python version" src="https://img.shields.io/badge/python-3.9+-blue.svg"></a>
     <a href="#"><img alt="React UI" src="https://img.shields.io/badge/UI-React%20%2B%20Vite-61DAFB?logo=react&logoColor=white"></a>
     <a href="#"><img alt="Stars" src="https://img.shields.io/github/stars/joshdeansavv/CMAS?style=social"></a>
@@ -141,5 +141,5 @@ CMAS logic is fundamentally mapped to verified academic architectures:
 ---
 
 <div align="center">
-  <i>Developed algorithmically by joshdeansavv. Released under a Non-Commercial Open-Source License to ensure ethical deployment.</i>
+  <i>Developed algorithmically by joshdeansavv. This repository is NOT open-source; it is released under a strict <strong>Source-Available Proprietary License</strong> for personal and academic evaluation only.</i>
 </div>
