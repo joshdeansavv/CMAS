@@ -138,6 +138,27 @@ class WebChannel:
                                 self.gateway._chat_handler.apply_steering(session_id, steer_text)
                                 await ws.send_json({"type": "message", "text": f"*System: Steering command injected into active reasoning process.*"})
                         continue
+                        
+                    elif msg_type == "pause_task":
+                        task_id = data.get("task_id")
+                        if task_id:
+                            self.gateway.pause_task(task_id)
+                            await ws.send_json({"type": "message", "text": f"*System: Mission Control issued PAUSE for task {task_id}.*"})
+                        continue
+                        
+                    elif msg_type == "resume_task":
+                        task_id = data.get("task_id")
+                        if task_id:
+                            self.gateway.resume_task(task_id)
+                            await ws.send_json({"type": "message", "text": f"*System: Mission Control issued RESUME for task {task_id}.*"})
+                        continue
+                        
+                    elif msg_type == "stop_task":
+                        task_id = data.get("task_id")
+                        if task_id:
+                            self.gateway.stop_task(task_id)
+                            await ws.send_json({"type": "message", "text": f"*System: Mission Control issued TERMINATE for task {task_id}.*"})
+                        continue
 
                     if not text:
                         continue
@@ -190,3 +211,59 @@ class WebChannel:
                 await ws.send_json(payload)
             except Exception:
                 pass
+
+    # ── Workspace C2 Endpoints ────────────────────────────────────
+
+    async def handle_workspace_tree(self, request: web.Request) -> web.Response:
+        """Returns the file tree of the workspace directory for the Web C2 Cockpit."""
+        import os
+        from pathlib import Path
+        base_dir = getattr(self.gateway, 'project_dir', Path("."))
+
+        def build_tree(dir_path):
+            tree = []
+            try:
+                for entry in os.scandir(dir_path):
+                    if entry.name.startswith(('__', '.')): continue
+                    node = {"name": entry.name, "path": str(Path(entry.path).relative_to(base_dir))}
+                    if entry.is_dir():
+                        node["type"] = "directory"
+                        node["children"] = build_tree(entry.path)
+                    else:
+                        node["type"] = "file"
+                        node["size"] = entry.stat().st_size
+                    tree.append(node)
+                return sorted(tree, key=lambda x: (x["type"] != "directory", x["name"]))
+            except Exception:
+                return []
+            
+        try:
+            return web.json_response(build_tree(base_dir))
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def handle_workspace_file(self, request: web.Request) -> web.Response:
+        """Returns raw file content for the Web C2 Cockpit file viewer."""
+        path = request.query.get("path")
+        if not path:
+            return web.json_response({"error": "No path provided"}, status=400)
+            
+        try:
+            from pathlib import Path
+            base_dir = getattr(self.gateway, 'project_dir', Path(".")).resolve()
+            full_path = (base_dir / path).resolve()
+            
+            # Prevent path traversal scaling
+            if not str(full_path).startswith(str(base_dir)):
+                return web.json_response({"error": "Path escaping detected. Permission denied."}, status=403)
+                
+            if not full_path.exists() or not full_path.is_file():
+                return web.json_response({"error": "File not found"}, status=404)
+                
+            # If it's a binary file or unreadable, we just catch the decode error
+            content = full_path.read_text(encoding="utf-8")
+            return web.json_response({"content": content})
+        except UnicodeDecodeError:
+            return web.json_response({"error": "Binary file cannot be displayed."}, status=400)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)

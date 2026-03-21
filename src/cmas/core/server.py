@@ -73,6 +73,10 @@ class CMASServer:
         # WebSocket endpoint
         app.router.add_get("/ws", self.web_channel.websocket_handler)
 
+        # API Endpoints
+        app.router.add_get("/api/workspace", self.web_channel.handle_workspace_tree)
+        app.router.add_get("/api/workspace/file", self.web_channel.handle_workspace_file)
+
         # Static web UI
         if WEB_DIR.exists():
             app.router.add_get("/", self._serve_index)

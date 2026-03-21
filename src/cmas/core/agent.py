@@ -193,6 +193,10 @@ COGNITIVE GUIDELINES:
 
     async def execute(self, task: Task) -> str:
         """Execute a task using the REASON -> ACT -> REFLECT loop."""
+        
+        if self.gateway:
+            self.gateway.register_task(task.id)
+            
         self.hub.set_agent_status(self.name, "working", task.id)
         self.hub.update_task(task.id, status="in_progress", assigned_to=self.name)
 
@@ -222,9 +226,14 @@ COGNITIVE GUIDELINES:
         tool_handlers = self._get_tool_handlers()
 
         async def on_tool_call(tool_name, args, result_preview):
+            if self.gateway:
+                await self.gateway.check_interrupt(task.id, self.name)
             self._log(f"  tool: {tool_name}({str(args)[:60]}...)")
 
         try:
+            if self.gateway:
+                await self.gateway.check_interrupt(task.id, self.name)
+                
             result = await chat_with_tools(
                 messages=messages,
                 tool_defs=TOOL_DEFS,
@@ -255,6 +264,12 @@ COGNITIVE GUIDELINES:
 
             return result
 
+        except asyncio.CancelledError as e:
+            error_msg = f"Task Terminated via Mission Control: {e}"
+            self.hub.update_task(task.id, status="killed", result=error_msg)
+            self.hub.set_agent_status(self.name, "idle")
+            self._log(error_msg)
+            return error_msg
         except Exception as e:
             error_msg = f"Failed: {e}"
             self.hub.update_task(task.id, status="failed", result=error_msg)

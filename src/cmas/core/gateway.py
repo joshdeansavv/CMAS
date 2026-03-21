@@ -94,6 +94,10 @@ class Gateway:
         self._installed_packages: set = set()
         self.on_audit_event = None
         self._lock = asyncio.Lock()
+        
+        # Mission Control C2 Hooks
+        self._task_pause_events: Dict[str, asyncio.Event] = {}
+        self._task_stop_events: Dict[str, asyncio.Event] = {}
 
         self._print("Gateway initialized")
 
@@ -136,6 +140,46 @@ class Gateway:
         """Check if an agent is within rate limits for a tool."""
         state = self._rate_limits[agent_name][tool_name]
         return state.check(self.rate_limit_calls, self.rate_limit_window)
+
+    # ── Task Interruption & Mission Control ──────────────────────
+
+    def register_task(self, task_id: str):
+        """Register a task to be externally controllable via C2."""
+        self._task_pause_events[task_id] = asyncio.Event()
+        self._task_pause_events[task_id].set()  # Default: Not Paused
+        self._task_stop_events[task_id] = asyncio.Event()
+
+    def pause_task(self, task_id: str):
+        if task_id in self._task_pause_events:
+            self._task_pause_events[task_id].clear()
+            self._audit("Gateway_C2", "intervene", "pause_task", f"target={task_id}", "", True)
+            self._print(f"Task {task_id} PAUSED by Mission Control.")
+
+    def resume_task(self, task_id: str):
+        if task_id in self._task_pause_events:
+            self._task_pause_events[task_id].set()
+            self._audit("Gateway_C2", "intervene", "resume_task", f"target={task_id}", "", True)
+            self._print(f"Task {task_id} RESUMED by Mission Control.")
+
+    def stop_task(self, task_id: str):
+        if task_id in self._task_stop_events:
+            self._task_stop_events[task_id].set()
+            if task_id in self._task_pause_events:
+                self._task_pause_events[task_id].set()  # Unblock if asleep to allow death
+            self._audit("Gateway_C2", "intervene", "terminate_task", f"target={task_id}", "", True)
+            self._print(f"Task {task_id} TERMINATED by Mission Control.")
+
+    async def check_interrupt(self, task_id: str, agent_name: str = "Unknown"):
+        """Hardware-level interception. Halts the script if paused."""
+        if task_id in self._task_stop_events and self._task_stop_events[task_id].is_set():
+            raise asyncio.CancelledError(f"Task {task_id} was externally TERMiNATED by Mission Control.")
+        
+        if task_id in self._task_pause_events and not self._task_pause_events[task_id].is_set():
+            self._print(f"[{agent_name}] INTERCEPTED: Agent sleeping due to Mission Control Pause...")
+            self.hub.set_agent_status(agent_name, "paused", task_id)
+            await self._task_pause_events[task_id].wait()
+            self._print(f"[{agent_name}] AWOKEN: Agent resuming operations...")
+            self.hub.set_agent_status(agent_name, "working", task_id)
 
     # ── Loop / Recursion Detection ───────────────────────────────
 
