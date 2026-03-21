@@ -98,6 +98,7 @@ async def chat_with_tools(
     model: str = "gpt-4.1-nano",
     max_rounds: int = 4,
     on_tool_call: Optional[object] = None,
+    check_interrupt: Optional[Callable] = None,
 ) -> str:
     """Run a tool-use loop until the model produces a final text response.
 
@@ -123,6 +124,11 @@ async def chat_with_tools(
     max_consecutive_errors = 3
 
     for round_num in range(max_rounds):
+        if check_interrupt:
+            override = check_interrupt()
+            if override:
+                msgs.append({"role": "user", "content": f"[SYSTEM EXPLICIT OVERRIDE/STEERING]: {override}"})
+                
         try:
             response = await chat(msgs, model=model, tools=tool_defs if tool_defs else None)
         except Exception as e:

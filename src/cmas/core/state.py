@@ -44,6 +44,7 @@ class Hub:
         self.project_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = self.project_dir / "hub.db"
         self._local = threading.local()
+        self.on_status_change = None
         self._init_db()
 
     def _get_conn(self) -> sqlite3.Connection:
@@ -220,6 +221,11 @@ class Hub:
             (name, status, current_task, time.time()),
         )
         conn.commit()
+        if self.on_status_change:
+            try:
+                self.on_status_change(name, status, current_task)
+            except Exception:
+                pass
 
     def get_agent_statuses(self) -> List[Dict]:
         conn = self._get_conn()

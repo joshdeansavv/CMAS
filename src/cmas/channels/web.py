@@ -17,6 +17,42 @@ class WebChannel:
         self.gateway = gateway
         self.connections: Dict[str, web.WebSocketResponse] = {}
 
+        # Register telemetry broadcasts
+        if hasattr(self.gateway, 'on_audit_event'):
+            self.gateway.on_audit_event = self._broadcast_audit
+
+        if hasattr(self.gateway.hub, 'on_status_change'):
+            self.gateway.hub.on_status_change = self._broadcast_status
+
+    def _broadcast_audit(self, entry):
+        payload = {
+            "type": "telemetry",
+            "agent": entry.agent,
+            "action": entry.action,
+            "tool": entry.tool,
+            "args": entry.args_summary,
+            "allowed": entry.allowed,
+            "duration": getattr(entry, "duration_ms", 0.0)
+        }
+        asyncio.create_task(self.push_to_all_json(payload))
+        
+    def _broadcast_status(self, name: str, status: str, task: str):
+        payload = {
+            "type": "agent_status",
+            "agent": name,
+            "status": status,
+            "task": task
+        }
+        asyncio.create_task(self.push_to_all_json(payload))
+        
+    async def push_to_all_json(self, payload: dict):
+        for ws in list(self.connections.values()):
+            if not ws.closed:
+                try:
+                    await ws.send_json(payload)
+                except Exception:
+                    pass
+
     async def websocket_handler(self, request: web.Request) -> web.WebSocketResponse:
         ws = web.WebSocketResponse()
         await ws.prepare(request)
@@ -28,6 +64,13 @@ class WebChannel:
         # Send session ID back so client can persist it
         await ws.send_json({"type": "session", "session_id": session_id})
 
+        # Send current roster on connect
+        try:
+            statuses = self.gateway.hub.get_agent_statuses()
+            await ws.send_json({"type": "roster_init", "agents": statuses})
+        except Exception:
+            pass
+
         try:
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:
@@ -37,10 +80,58 @@ class WebChannel:
                         data = {"text": msg.data}
 
                     text = data.get("text", "").strip()
-                    if not text:
+                    msg_type = data.get("type", "chat")
+                    uid = data.get("user_id", user_id)
+
+                    if msg_type == "get_sessions":
+                        try:
+                            # Fetch directly from backend DB bypassing LLM
+                            sessions_db = self.gateway._chat_handler.sessions.list_sessions(user_id=uid, limit=30)
+                            session_list = [{"id": s.session_id, "summary": s.context_summary or "New Session", "last_active": s.last_active} for s in sessions_db]
+                            await ws.send_json({"type": "session_list", "sessions": session_list})
+                        except Exception as e:
+                            print(f"Error fetching sessions: {e}")
+                        continue
+                        
+                    elif msg_type == "set_project":
+                        project = data.get("project", "").strip()
+                        if project:
+                            # Inject this directly into long term memory
+                            self.gateway._chat_handler.memory.store(
+                                topic="Current User Project",
+                                content=f"The user is currently focused exclusively on the project: {project}. Tailor responses to this.",
+                                category="preference",
+                                source="web_ui",
+                                project="chat",
+                                confidence=1.0
+                            )
+                            await ws.send_json({"type": "message", "text": f"*System: Project context switched to '{project}'.*"})
+                        continue
+                        
+                    elif msg_type == "add_reminder":
+                        desc = data.get("description", "")
+                        when = data.get("when", "")
+                        if desc and when:
+                            try:
+                                session_state = self.gateway._chat_handler.sessions.get_or_create(session_id, uid, "web")
+                                handlers = self.gateway._chat_handler._build_tool_handlers(session_state)
+                                res = await handlers["create_reminder"](description=desc, when=when)
+                                await ws.send_json({"type": "message", "text": f"*System: {res}*"})
+                            except Exception as e:
+                                await ws.send_json({"type": "message", "text": f"*System: Failed to set reminder: {e}*"})
+                        continue
+                        
+                    elif msg_type == "steer":
+                        steer_text = data.get("text", "")
+                        if steer_text:
+                            # Trigger the Async LLM boundary interrupt
+                            if hasattr(self.gateway._chat_handler, 'apply_steering'):
+                                self.gateway._chat_handler.apply_steering(session_id, steer_text)
+                                await ws.send_json({"type": "message", "text": f"*System: Steering command injected into active reasoning process.*"})
                         continue
 
-                    uid = data.get("user_id", user_id)
+                    if not text:
+                        continue
 
                     # Send typing indicator
                     await ws.send_json({"type": "typing", "status": True})
@@ -81,3 +172,12 @@ class WebChannel:
         """Push a message to all connected sessions."""
         for sid in list(self.connections):
             await self.push_to_session(sid, text)
+
+    async def send_control_message(self, session_id: str, payload: dict):
+        """Push a raw control JSON dict to a session (e.g., to force UI changes)."""
+        ws = self.connections.get(session_id)
+        if ws and not ws.closed:
+            try:
+                await ws.send_json(payload)
+            except Exception:
+                pass

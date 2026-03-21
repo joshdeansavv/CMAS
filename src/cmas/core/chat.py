@@ -181,6 +181,42 @@ CHAT_EXTRA_TOOL_DEFS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_sessions",
+            "description": "List the user's recent chat sessions with summaries.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "switch_session",
+            "description": "Switch the user's active UI to a different session ID.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string", "description": "The exact session ID to switch to"}
+                },
+                "required": ["session_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "ask_user",
+            "description": "Pause your work and ask the user a direct question to get clarification or permission.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "question": {"type": "string", "description": "The question to ask"}
+                },
+                "required": ["question"],
+            },
+        },
+    },
 ]
 
 
@@ -250,14 +286,33 @@ class ChatHandler:
         self.reasoner = Reasoner(model=self.model)
         self._scheduler = None  # set by server after init
         self._push_callback: Optional[Callable] = None  # for pushing proactive messages
+        self._control_callback: Optional[Callable] = None  # for pushing UI control commands
         self._db_path = scheduler_db_path or config.sqlite_path
+        self._steering_queues: Dict[str, asyncio.Queue] = {}
+
+    def apply_steering(self, session_id: str, text: str):
+        if session_id not in self._steering_queues:
+            self._steering_queues[session_id] = asyncio.Queue()
+        self._steering_queues[session_id].put_nowait(text)
 
     def set_push_callback(self, cb: Callable):
         """Set callback for pushing messages to users: cb(session_id, channel, text)."""
         self._push_callback = cb
 
+    def set_control_callback(self, cb: Callable):
+        """Set callback for pushing UI system commands: cb(session_id, channel, payload_dict)."""
+        self._control_callback = cb
+
     async def handle(self, session: Session, user_text: str) -> str:
         """Handle one user message and return a response."""
+        
+        self._steering_queues[session.session_id] = asyncio.Queue()
+        def check_interrupt() -> Optional[str]:
+            q = self._steering_queues.get(session.session_id)
+            if q and not q.empty():
+                return q.get_nowait()
+            return None
+            
         # Store user message
         self.sessions.add_message(
             session.session_id, session.user_id, "user",
@@ -301,6 +356,7 @@ class ChatHandler:
                 tool_handlers=tool_handlers,
                 model=self.model,
                 max_rounds=15,
+                check_interrupt=check_interrupt,
             )
         except Exception as e:
             response = f"I encountered an error: {e}"
@@ -369,6 +425,25 @@ class ChatHandler:
             parts.append("RELEVANT MEMORIES:")
             parts.append(memory_context)
 
+        # Load personality profile
+        try:
+            import yaml
+            p_path = Path("personality.yaml")
+            if p_path.exists():
+                with open(p_path) as f:
+                    p = yaml.safe_load(f)
+                parts.append("")
+                parts.append("PERSONALITY PROFILE:")
+                if p.get("agent_name"): parts.append(f"Name: {p.get('agent_name')}")
+                if p.get("focus"): parts.append(f"Focus: {p.get('focus')}")
+                if p.get("tone"): parts.append(f"Tone: {p.get('tone')}")
+                if p.get("directives"):
+                    parts.append("Directives:")
+                    for d in p.get("directives"):
+                        parts.append(f" - {d}")
+        except Exception:
+            pass
+
         parts.append("")
         parts.append(f"Session: {session.session_id} | Channel: {session.channel}")
 
@@ -435,6 +510,31 @@ class ChatHandler:
         async def handle_send_message(recipient: str, content: str, **kw) -> str:
             return f"Message noted for {recipient}: {content}"
 
+        async def handle_find_sessions(**kw) -> str:
+            sessions = self.sessions.list_sessions(session.user_id, limit=10)
+            if not sessions:
+                return "No recent sessions found."
+            lines = []
+            for s in sessions:
+                last_active = datetime.fromtimestamp(s.last_active).strftime("%Y-%m-%d %H:%M:%S")
+                lines.append(f"Session: {s.session_id} | Last Active: {last_active} | Summary: {s.context_summary or 'No summary'}")
+            return "Recent Sessions:\n" + "\n".join(lines)
+
+        async def handle_switch_session(session_id: str, **kw) -> str:
+            if hasattr(self, '_control_callback') and self._control_callback:
+                await self._control_callback(session.session_id, session.channel, {"type": "session", "session_id": session_id})
+                return f"Successfully commanded the user interface to switch to session '{session_id}'."
+            return "Error: Control callback not configured. Cannot switch UI session natively."
+
+        async def handle_ask_user(question: str, **kw) -> str:
+            if self._push_callback:
+                await self._push_callback(session.session_id, session.channel, f"❓ **Agent needs input**: {question}")
+            
+            q = self._steering_queues.setdefault(session.session_id, asyncio.Queue())
+            # Wait indefinitely for the user to reply via 'steer' packet
+            answer = await q.get()
+            return f"User replied: {answer}"
+
         handlers["create_reminder"] = handle_create_reminder
         handlers["create_scheduled_task"] = handle_create_scheduled_task
         handlers["list_scheduled_tasks"] = handle_list_scheduled_tasks
@@ -443,6 +543,9 @@ class ChatHandler:
         handlers["remember"] = handle_remember
         handlers["recall"] = handle_recall
         handlers["send_message"] = handle_send_message
+        handlers["find_sessions"] = handle_find_sessions
+        handlers["switch_session"] = handle_switch_session
+        handlers["ask_user"] = handle_ask_user
 
         return handlers
 

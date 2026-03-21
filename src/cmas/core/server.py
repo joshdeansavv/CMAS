@@ -49,6 +49,7 @@ class CMASServer:
 
         # Set up push callback for proactive messages
         self.chat_handler.set_push_callback(self._push_to_session)
+        self.chat_handler.set_control_callback(self._push_control_to_session)
 
         # Background tasks
         self._background_tasks = []
@@ -58,6 +59,12 @@ class CMASServer:
         adapter = self.channels.get(channel)
         if adapter:
             await adapter.push_to_session(session_id, text)
+
+    async def _push_control_to_session(self, session_id: str, channel: str, payload: dict):
+        """Push a raw control dictionary to the web channel UI."""
+        adapter = self.channels.get(channel)
+        if adapter and hasattr(adapter, 'send_control_message'):
+            await adapter.send_control_message(session_id, payload)
 
     def _build_app(self) -> web.Application:
         app = web.Application()

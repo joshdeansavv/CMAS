@@ -92,6 +92,7 @@ class Gateway:
         self._agent_call_depth: Dict[str, int] = defaultdict(int)
         self._registered_agents: Dict[str, Any] = {}
         self._installed_packages: set = set()
+        self.on_audit_event = None
         self._lock = asyncio.Lock()
 
         self._print("Gateway initialized")
@@ -165,6 +166,12 @@ class Gateway:
             duration_ms=duration_ms,
         )
         self._audit_log.append(entry)
+
+        if self.on_audit_event:
+            try:
+                self.on_audit_event(entry)
+            except Exception:
+                pass
 
         # Also persist to hub
         self.hub.send_message(

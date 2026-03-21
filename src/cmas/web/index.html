@@ -3,21 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CMAS</title>
+    <title>CMAS Dashboard</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div id="app">
-        <header>
-            <h1>CMAS</h1>
-            <span id="status" class="status disconnected">disconnected</span>
-        </header>
-        <div id="messages"></div>
-        <div id="typing" class="typing hidden">CMAS is thinking...</div>
-        <form id="input-form">
-            <textarea id="input" placeholder="Send a message..." rows="1" autofocus></textarea>
-            <button type="submit" id="send-btn">Send</button>
-        </form>
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar">
+            <h2 class="brand">CMAS Hub</h2>
+            <div class="section-title">Sessions</div>
+            <button id="new-session-btn" class="action-btn">+ New Session</button>
+            <div id="session-list" class="scrollable">
+                <div class="loading">Loading sessions...</div>
+            </div>
+            
+            <hr>
+            <div class="section-title">Reminders</div>
+            <div id="reminder-form" class="sidebar-form">
+                <input type="text" id="rem-desc" placeholder="Remind me to...">
+                <input type="text" id="rem-when" placeholder="E.g., in 5 minutes">
+                <button id="rem-btn" class="action-btn">Add Reminder</button>
+            </div>
+        </aside>
+        
+        <!-- Main Chat Area -->
+        <main>
+            <header>
+                <div class="header-left">
+                    <span id="current-session-label">Session: </span>
+                    <span id="status" class="status disconnected">disconnected</span>
+                </div>
+                <div class="header-right">
+                    <label for="project-input" class="label-muted">Project Focus:</label>
+                    <input type="text" id="project-input" placeholder="None set...">
+                    <button id="project-btn" class="secondary-btn">Set</button>
+                </div>
+            </header>
+            
+            <div id="messages"></div>
+            <div id="typing" class="typing hidden">
+                <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            </div>
+            
+            <form id="input-form">
+                <textarea id="input" placeholder="Message CMAS or steer..." rows="1" autofocus></textarea>
+                <div class="input-actions" style="display:flex; flex-direction:column; gap:4px;">
+                    <button type="submit" id="send-btn">Send</button>
+                    <button type="button" id="steer-btn" class="secondary-btn" title="Interrupt the Agent's active thinking process to guide it">Steer / Answer</button>
+                </div>
+            </form>
+        </main>
+        
+        <!-- Live Agent Roster & Telemetry HUD -->
+        <aside id="right-sidebar">
+            <div class="section-title">Agent Roster</div>
+            <div id="agent-roster" class="scrollable" style="flex-grow:0; min-height:100px;">
+                <div class="label-muted">No active agents...</div>
+            </div>
+            
+            <hr>
+            <div class="section-title">Live Telemetry</div>
+            <div id="telemetry-log" class="scrollable telemetry-box"></div>
+        </aside>
     </div>
     <script src="/static/app.js"></script>
 </body>
