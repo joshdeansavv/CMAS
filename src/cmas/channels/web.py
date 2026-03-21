@@ -93,6 +93,15 @@ class WebChannel:
                             print(f"Error fetching sessions: {e}")
                         continue
                         
+                    elif msg_type == "get_history":
+                        try:
+                            # Fetch chat history for this session to resume on refresh
+                            history = self.gateway._chat_handler.sessions.get_context(session_id, limit=100)
+                            await ws.send_json({"type": "history", "messages": history})
+                        except Exception as e:
+                            print(f"Error fetching history: {e}")
+                        continue
+                        
                     elif msg_type == "set_project":
                         project = data.get("project", "").strip()
                         if project:

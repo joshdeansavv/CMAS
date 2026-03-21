@@ -14,7 +14,7 @@ from .session import SessionManager
 from .chat import ChatHandler
 from ..channels.web import WebChannel
 
-WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+WEB_DIR = Path(__file__).resolve().parent.parent / "web-app" / "dist"
 
 
 class CMASServer:
@@ -39,6 +39,7 @@ class CMASServer:
             config=config,
             scheduler_db_path=config.sqlite_path,
         )
+        self.chat_handler.gateway = self.gateway
         self.gateway.set_chat_handler(self.chat_handler)
 
         # Channels
@@ -75,7 +76,10 @@ class CMASServer:
         # Static web UI
         if WEB_DIR.exists():
             app.router.add_get("/", self._serve_index)
-            app.router.add_static("/static", str(WEB_DIR), name="static")
+            # Vite bundles its static files in /assets
+            app.router.add_static("/assets", str(WEB_DIR / "assets"), name="assets")
+            # Also serve root static files if any (like favicon)
+            app.router.add_static("/", str(WEB_DIR), name="static", show_index=False)
 
         # Health check
         app.router.add_get("/health", self._health_handler)

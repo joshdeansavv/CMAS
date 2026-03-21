@@ -581,4 +581,59 @@ Return ONLY JSON."""},
             if self._incubating:
                 self._incubating.append(self._incubating.pop(0))
 
+        # 3. Autonomous Deep Exploration (Curiosity Engine)
+        if random.random() < 0.6:  # 60% chance to explore per cycle
+            recent_topics = [k.topic for k in self.memory.get_recent(limit=15)]
+            if recent_topics:
+                try:
+                    from .tools import web_search
+                    
+                    # Synthesize a highly advanced query based on perceived knowledge gaps
+                    response = await chat(
+                        messages=[
+                            {"role": "system", "content": "You are a Curiosity Engine. Based on the user's recent topics, identify ONE highly complex, non-obvious aspect that you should deep-dive on to improve your mastery of the domain. Return ONLY JSON: {\"query\": \"exact search string\"}"},
+                            {"role": "user", "content": f"Recent topics: {recent_topics}"}
+                        ],
+                        model=self.model,
+                        temperature=0.8
+                    )
+                    
+                    text = response.content.strip()
+                    if text.startswith("```"):
+                        text = text.split("\n", 1)[1].rsplit("```", 1)[0]
+                    query_data = json.loads(text)
+                    
+                    if "query" in query_data:
+                        exploration_query = query_data["query"]
+                        search_result = await web_search(exploration_query, max_results=3)
+                        
+                        # Synthesize into Semantic Schema
+                        synthesis = await chat(
+                            messages=[
+                                {"role": "system", "content": "You are compressing raw web research into a dense, generalized semantic memory. Extract the core principles and facts. Return ONLY the synthesis without apologies or preface."},
+                                {"role": "user", "content": f"Query: {exploration_query}\n\nResults: {search_result}"}
+                            ],
+                            model=self.model,
+                            temperature=0.3
+                        )
+                        
+                        if "exploration_insights" not in results:
+                            results["exploration_insights"] = []
+                        
+                        results["exploration_insights"].append({
+                            "query": exploration_query,
+                            "findings": synthesis.content[:500]
+                        })
+                        
+                        # Immediately commit the new generalized concept to Long-Term ChromaDB memory
+                        self.memory.store(
+                            topic=f"deep_research: {exploration_query}",
+                            content=synthesis.content[:3000],
+                            category="exploration",
+                            source="dmn_exploration",
+                            confidence=0.85
+                        )
+                except Exception:
+                    pass
+
         return results

@@ -139,6 +139,9 @@ class Scheduler:
             # If we got interesting insights, we could store them
             # For now, just let the DMN run and store in memory
             recombinations = results.get("recombinations", [])
+            
+            gateway = getattr(self.chat_handler, "gateway", None)
+            
             for r in recombinations:
                 if r.get("content"):
                     self.memory.store(
@@ -148,8 +151,16 @@ class Scheduler:
                         source="dmn_idle",
                         confidence=0.3,
                     )
-        except Exception:
-            pass  # DMN is optional
+                if gateway and r.get("connection"):
+                    gateway._audit("DMN_Brain", "creative_insight", "memory_recombination", r.get("connection")[:100], "", True)
+                    
+            for e in results.get("exploration_insights", []):
+                msg = e['query'][:100]
+                if gateway:
+                    gateway._audit("ExplorationAgent", "curiosity_gap", "web_search", msg, e['findings'][:100], True)
+
+        except Exception as e:
+            print(f"[Scheduler] DMN error: {e}")
 
     async def _notify(self, session_id: str, channel: str, message: str):
         """Send a notification to a user session."""
