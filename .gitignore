@@ -19,6 +19,7 @@ venv/
 # ──────────────────────────────────────────────────────────────────────
 .c2_mission_data/
 .c2_mission_workspace/
+.guardian/
 data/
 workspace/
 logs/
