@@ -12,9 +12,17 @@
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)
 ![OpenAI](https://img.shields.io/badge/OpenAI-compatible-412991?style=flat-square&logo=openai&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-persistent-003B57?style=flat-square&logo=sqlite&logoColor=white)
-![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-blueviolet?style=flat-square)
+![License](https://img.shields.io/badge/license-Proprietary%20%7C%20Hobbyist%20Only-red?style=flat-square)
 
 </div>
+
+---
+
+> **LICENSE NOTICE:** This software is **proprietary** and **NOT open source**.
+> It is owned exclusively by **[JoshDeanSavv](https://github.com/JoshDeanSavv)**.
+> Use is permitted **for hobbyists only**, with attribution required.
+> Selling, redistributing, or modifying this software (beyond personal hobby use) is **strictly prohibited**.
+> See [LICENSE](./LICENSE) for full terms.
 
 ---
 

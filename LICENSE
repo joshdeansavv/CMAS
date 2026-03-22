@@ -1,29 +1,76 @@
-PolyForm Noncommercial License 1.0.0
+CMAS Proprietary License
+Copyright (c) 2026 JoshDeanSavv. All Rights Reserved.
 
-Copyright (c) 2026 CMAS Contributors and joshdeansavv
+NOTICE: This software is NOT open source. All rights not explicitly granted herein are
+reserved exclusively by the copyright holder, JoshDeanSavv.
 
-This software is NOT open source. It is provided under a Source-Available model.
+────────────────────────────────────────────────────────────────────────────────────────
+OWNERSHIP
+────────────────────────────────────────────────────────────────────────────────────────
 
-< TERMS >
+This software, including all source code, documentation, assets, and associated files
+(collectively, the "Software"), is the exclusive intellectual property of JoshDeanSavv
+("Owner"). No ownership rights are transferred by any use or access of this Software.
 
-1. Grant of License
-Subject to the limitations set out below, the Licensor grants you a non-exclusive, royalty-free, worldwide license to:
-- Use, reproduce, display, and perform the Software in any environment.
-- Modify the Software and create derivative works.
+────────────────────────────────────────────────────────────────────────────────────────
+PERMITTED USE — HOBBYISTS ONLY
+────────────────────────────────────────────────────────────────────────────────────────
 
-2. Noncommercial Restriction
-You may NOT use the Software (or any derivative work) for Commercial purposes. “Commercial purposes” means any use of the Software to generate revenue, directly or indirectly, including but not limited to:
-- Providing the Software as a paid Service (SaaS).
-- Embedding the Software in a commercial application or hardware product.
-- Using the Software to support the operations of a commercial entity.
+You are permitted to use this Software ONLY if ALL of the following conditions are met:
 
-3. Personal and Academic Use
-You MAY use the Software for personal, non-commercial research, academic study, and hobbyist software development. 
+  1. Your use is strictly personal, non-commercial, and for hobbyist purposes.
+  2. You do not generate any revenue, directly or indirectly, from your use.
+  3. You provide clear and visible attribution to the Owner in any output or project
+     that makes use of this Software. Attribution must include:
+       - The project name: CMAS
+       - The Owner's name: JoshDeanSavv
+       - A link to the original repository (if publicly available)
 
-4. Redistribution
-You may distribute verbatim copies of this Software to third parties, provided you include this license and copyright notice. You may NOT distribute the Software for any commercial advantage.
+────────────────────────────────────────────────────────────────────────────────────────
+PROHIBITED ACTIONS — ALL OF THE FOLLOWING ARE STRICTLY FORBIDDEN
+────────────────────────────────────────────────────────────────────────────────────────
 
-5. Disclaimer of Warranty
-THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITH ALL FAULTS, WITHOUT WARRANTY OF ANY KIND. THE LICENSOR EXPRESSLY DISCLAIMS ALL WARRANTIES, WHETHER EXPRESS, IMPLIED, STATUTORY OR OTHERWISE.
+You MAY NOT, under any circumstances:
 
-If you wish to use this software for commercial purposes, you must negotiate a separate commercial license with the Copyright Holder.
+  1. SELL this Software, in whole or in part, or any derivative thereof.
+  2. REDISTRIBUTE this Software, in whole or in part, in any form, to any third party,
+     through any channel (public or private), including but not limited to GitHub forks
+     intended for redistribution, package registries, or file sharing.
+  3. MODIFY this Software for any purpose other than personal hobbyist use.
+     Modified versions MUST NOT be shared, distributed, published, or deployed beyond
+     the original modifier's own personal use.
+  4. USE this Software in any commercial product, service, application, or workflow,
+     whether for profit or not-for-profit organizational operations.
+  5. SUBLICENSE, rent, lease, or otherwise transfer any rights in this Software.
+  6. REMOVE or ALTER this license notice, copyright notice, or any attribution markers
+     from any copy or portion of the Software.
+  7. CLAIM ownership or authorship of this Software or any substantial portion of it.
+  8. USE this Software in any AI training pipeline, dataset, or model without explicit
+     written permission from the Owner.
+
+────────────────────────────────────────────────────────────────────────────────────────
+NO WARRANTY
+────────────────────────────────────────────────────────────────────────────────────────
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
+THE OWNER SHALL NOT BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM,
+OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+────────────────────────────────────────────────────────────────────────────────────────
+ENFORCEMENT
+────────────────────────────────────────────────────────────────────────────────────────
+
+Any use of this Software that violates the terms above constitutes copyright infringement
+and may subject the violator to civil and/or criminal liability under applicable law.
+The Owner reserves the right to pursue all available legal remedies.
+
+────────────────────────────────────────────────────────────────────────────────────────
+COMMERCIAL LICENSING
+────────────────────────────────────────────────────────────────────────────────────────
+
+If you wish to use this Software for any purpose not permitted above, you must obtain
+explicit written permission from the Owner prior to any such use.
+
+Contact: JoshDeanSavv (via GitHub — https://github.com/JoshDeanSavv)
+
+────────────────────────────────────────────────────────────────────────────────────────
