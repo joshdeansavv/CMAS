@@ -118,6 +118,19 @@ class Hub:
             except Exception:
                 pass
 
+        # Reset agents stuck in "working" from a previous session
+        stale = conn.execute(
+            "SELECT COUNT(*) FROM agent_status WHERE status = 'working'"
+        ).fetchone()[0]
+        if stale:
+            conn.execute(
+                "UPDATE agent_status SET status = 'idle', current_task = '', "
+                "updated_at = ? WHERE status = 'working'",
+                (time.time(),),
+            )
+            conn.commit()
+            print(f"[Hub] Reset {stale} stale agent(s) from previous session.")
+
     # ── Tasks ────────────────────────────────────────────────────
 
     def add_task(self, task: Task):
