@@ -1,0 +1,113 @@
+{
+  "id": "stages_of_change",
+  "name": "Transtheoretical Model (Stages of Change)",
+  "category": "mindset",
+  "description": "Maps where someone is in their change journey across 5 stages. Determines which interventions are appropriate at each stage.",
+  "when_to_use": [
+    "User is at a different readiness level than the task demands",
+    "Orchestrator needs to calibrate how aggressively to push toward a goal",
+    "User keeps asking about a topic but not acting on advice",
+    "Agent needs to determine appropriate intervention intensity"
+  ],
+  "stages": {
+    "precontemplation": {
+      "description": "Not yet considering change. May not see a problem.",
+      "signals": [
+        "User hasn't asked for help with this area",
+        "Resistance to suggestions",
+        "Deflection or minimization"
+      ],
+      "appropriate_actions": [
+        "Raise awareness gently through information",
+        "Ask open-ended questions, don't push solutions",
+        "Share relevant data without prescribing action"
+      ],
+      "inappropriate_actions": [
+        "Giving detailed action plans",
+        "Setting goals or deadlines",
+        "Assuming readiness to change"
+      ]
+    },
+    "contemplation": {
+      "description": "Aware of the issue, thinking about change but not committed.",
+      "signals": [
+        "User asks questions about options",
+        "Expresses ambivalence ('I should but...')",
+        "Exploring but not committing"
+      ],
+      "appropriate_actions": [
+        "Explore pros and cons of change",
+        "Use Socratic questioning to deepen awareness",
+        "Help envision what change would look like",
+        "Address specific barriers they mention"
+      ],
+      "inappropriate_actions": [
+        "Rushing to action steps",
+        "Ignoring stated concerns",
+        "Being prescriptive"
+      ]
+    },
+    "preparation": {
+      "description": "Committed to change, planning how to do it.",
+      "signals": [
+        "User asks for specific strategies",
+        "Setting timelines or milestones",
+        "Gathering resources"
+      ],
+      "appropriate_actions": [
+        "Help create concrete plans (use SMART/GROW)",
+        "Identify potential obstacles and plan for them",
+        "Break goals into actionable steps",
+        "Connect to relevant frameworks and tools"
+      ],
+      "inappropriate_actions": [
+        "Still debating whether to change",
+        "Overwhelming with too many options"
+      ]
+    },
+    "action": {
+      "description": "Actively implementing change.",
+      "signals": [
+        "User is executing plans",
+        "Reporting progress or setbacks",
+        "Asking for troubleshooting help"
+      ],
+      "appropriate_actions": [
+        "Provide specific tactical support",
+        "Monitor progress and adjust plans",
+        "Celebrate wins, problem-solve setbacks",
+        "Use behavioral frameworks (Habit Loop, Fogg)"
+      ],
+      "inappropriate_actions": [
+        "Questioning the decision to change",
+        "Introducing major new directions",
+        "Overloading with theory"
+      ]
+    },
+    "maintenance": {
+      "description": "Change is established, focus is on sustaining it.",
+      "signals": [
+        "User has been consistent for a period",
+        "Focus shifts from 'how to start' to 'how to keep going'",
+        "Concern about relapse"
+      ],
+      "appropriate_actions": [
+        "Identify and plan for relapse triggers",
+        "Reinforce identity-based habits",
+        "Gradually reduce check-in frequency",
+        "Help build self-sustaining systems"
+      ],
+      "inappropriate_actions": [
+        "Treating them like a beginner",
+        "Unnecessary intervention",
+        "Suggesting major overhauls"
+      ]
+    }
+  },
+  "stage_detection_prompts": [
+    "Has the user taken any concrete action toward this goal, or are they still exploring?",
+    "Is the user asking 'should I?' (contemplation) or 'how do I?' (preparation/action)?",
+    "How long has the user been working on this? Are they establishing or maintaining?",
+    "What level of specificity is the user requesting?"
+  ]
+}

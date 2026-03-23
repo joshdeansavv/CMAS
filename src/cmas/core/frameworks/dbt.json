@@ -1,0 +1,94 @@
+{
+  "id": "dbt",
+  "name": "Dialectical Behavior Therapy Skills",
+  "category": "emotional_health",
+  "description": "Skills for managing high-pressure situations: mindfulness, distress tolerance, emotional regulation, and interpersonal effectiveness.",
+  "when_to_use": [
+    "Task has high stakes or tight deadlines creating pressure",
+    "Agent encounters conflicting requirements or constraints",
+    "User is in emotional distress and needs grounding",
+    "Multiple agents are in conflict about approach",
+    "System is overwhelmed with competing priorities"
+  ],
+  "modules": {
+    "mindfulness": {
+      "description": "Observing the current situation without judgment",
+      "skills": {
+        "observe": "Notice what's happening without reacting — what are the facts?",
+        "describe": "Put words to the situation using only observable facts, no interpretations",
+        "participate": "Fully engage with the current task rather than multi-tracking anxiously"
+      },
+      "agent_prompts": [
+        "State only the observable facts of the current situation, no predictions or judgments",
+        "What do we know vs. what are we interpreting?",
+        "Focus entirely on this one sub-task before considering the next"
+      ]
+    },
+    "distress_tolerance": {
+      "description": "Surviving crisis moments without making things worse",
+      "skills": {
+        "stop": "Stop — don't react impulsively. Take one step back before the next action",
+        "pros_and_cons": "List pros and cons of acting on impulse vs. using a skill",
+        "tip": "Temperature — change the approach temperature. If running hot (aggressive), cool down. If cold (avoidant), warm up",
+        "radical_acceptance": "This IS the situation. Fighting reality wastes energy. Work with what IS"
+      },
+      "crisis_protocol": [
+        "STOP: Pause all agent actions for this task",
+        "OBSERVE: What specifically went wrong or is threatening the goal?",
+        "BREATHE: Reset context — clear assumptions, re-read the original objective",
+        "PROCEED: Choose one small, safe action. Do not try to solve everything at once"
+      ]
+    },
+    "emotion_regulation": {
+      "description": "Reducing vulnerability to reactive decision-making",
+      "skills": {
+        "check_the_facts": "Is the emotional response proportional to the actual situation?",
+        "opposite_action": "If the impulse is to avoid, lean in. If the impulse is to rush, slow down",
+        "accumulate_positives": "Build on small wins rather than fixating on gaps",
+        "build_mastery": "Tackle progressively harder sub-tasks to build capability and confidence"
+      },
+      "agent_prompts": [
+        "Is our level of effort proportional to the actual importance of this sub-task?",
+        "What would the opposite of our current impulse look like? Would that be more effective?",
+        "What have we already accomplished that we can build on?",
+        "What's the next skill-appropriate challenge — not too easy, not overwhelming?"
+      ]
+    },
+    "interpersonal_effectiveness": {
+      "description": "Communicating needs clearly while maintaining relationships",
+      "skills": {
+        "dear_man": {
+          "D": "Describe the situation objectively",
+          "E": "Express why this matters",
+          "A": "Assert what is needed clearly",
+          "R": "Reinforce — explain the benefit of cooperation",
+          "M": "Stay Mindful of the objective (don't get sidetracked)",
+          "A2": "Appear confident even under uncertainty",
+          "N": "Negotiate — be willing to give to get"
+        },
+        "give": {
+          "G": "Be Gentle — no attacks or judgments",
+          "I": "Act Interested in the other perspective",
+          "V": "Validate the other party's viewpoint",
+          "E": "Use an Easy manner — no rigidity"
+        }
+      },
+      "agent_prompts": [
+        "When communicating between agents: state the fact, the need, and the benefit of helping",
+        "When presenting to the user: describe what was done, why, and what's needed next",
+        "When agents disagree: validate both perspectives before proposing resolution"
+      ]
+    }
+  },
+  "dialectical_thinking": {
+    "description": "Holding two seemingly contradictory truths at the same time",
+    "core_principle": "Two opposing things can both be true. Replace 'but' with 'and'.",
+    "examples": [
+      "This task is extremely difficult AND we can make meaningful progress on it",
+      "The data is incomplete AND we can still draw useful conclusions",
+      "The user's request is ambitious AND we should attempt it fully",
+      "Our first approach failed AND that failure contains useful information"
+    ],
+    "agent_prompt": "What two truths are we treating as contradictory that could both be valid?"
+  }
+}

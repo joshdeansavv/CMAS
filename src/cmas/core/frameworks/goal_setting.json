@@ -1,0 +1,141 @@
+{
+  "id": "goal_setting",
+  "name": "Goal Setting Frameworks",
+  "category": "goals",
+  "description": "SMART, HARD, GROW, and OKR frameworks for turning ambitions into actionable plans.",
+  "when_to_use": [
+    "User states a vague goal that needs structure",
+    "Agent is decomposing a complex objective into tasks",
+    "Orchestrator is planning task breakdown",
+    "User wants accountability or tracking",
+    "Goal needs emotional commitment (HARD) or measurable tracking (OKR)"
+  ],
+  "frameworks": {
+    "smart": {
+      "name": "SMART Goals",
+      "description": "The standard for turning vague ambitions into actionable plans",
+      "best_for": "Concrete, well-defined objectives that need clear execution plans",
+      "criteria": {
+        "specific": {
+          "question": "What exactly will be accomplished? Who is involved? Where?",
+          "test": "Could someone else understand exactly what this means without clarification?"
+        },
+        "measurable": {
+          "question": "How will we know when it's achieved? What metrics define success?",
+          "test": "Can progress be tracked with a number, percentage, or clear milestone?"
+        },
+        "achievable": {
+          "question": "Is this realistic given current resources, skills, and constraints?",
+          "test": "Do we have or can we acquire what's needed? What's the biggest barrier?"
+        },
+        "relevant": {
+          "question": "Why does this matter? How does it connect to larger objectives?",
+          "test": "If achieved, would it meaningfully move the needle on what matters?"
+        },
+        "time_bound": {
+          "question": "When must this be completed? What are the intermediate deadlines?",
+          "test": "Is there a specific date, not just 'soon' or 'eventually'?"
+        }
+      },
+      "conversion_prompt": "Take the user's goal and restate it passing all 5 SMART criteria. If any criterion can't be met, ask the user for that specific information."
+    },
+    "hard": {
+      "name": "HARD Goals (Mark Murphy)",
+      "description": "Goals that drive deep emotional commitment through vivid connection",
+      "best_for": "When motivation is the bottleneck, not planning. For goals that require sustained effort through difficulty",
+      "criteria": {
+        "heartfelt": {
+          "question": "Why does this goal matter deeply? What personal values does it serve?",
+          "prompt": "Connect this goal to something the user genuinely cares about — not just outcomes, but meaning"
+        },
+        "animated": {
+          "question": "Can you vividly picture the end state? What does success look, feel, sound like?",
+          "prompt": "Paint a detailed picture of what life/work looks like when this goal is achieved"
+        },
+        "required": {
+          "question": "What happens if this doesn't get done? What's the cost of inaction?",
+          "prompt": "Make the urgency concrete — not fear-based, but clarity about stakes"
+        },
+        "difficult": {
+          "question": "Is this goal stretching beyond the comfort zone? Does it require growth?",
+          "prompt": "The goal should be challenging enough to require learning and adaptation, not so hard it's demoralizing"
+        }
+      }
+    },
+    "grow": {
+      "name": "GROW Model",
+      "description": "Structured coaching conversation for moving from current state to desired outcome",
+      "best_for": "One-on-one guidance sessions, self-reflection, when someone knows what they want but not how to get there",
+      "stages": {
+        "goal": {
+          "purpose": "Define what you want to achieve",
+          "questions": [
+            "What would you like to accomplish?",
+            "What does success look like specifically?",
+            "How will you know when you've achieved it?",
+            "Is this goal within your control?"
+          ]
+        },
+        "reality": {
+          "purpose": "Assess the current situation honestly",
+          "questions": [
+            "Where are you right now in relation to this goal?",
+            "What have you already tried?",
+            "What's working? What isn't?",
+            "What obstacles are you facing?",
+            "On a scale of 1-10, how far along are you?"
+          ]
+        },
+        "options": {
+          "purpose": "Explore possible paths forward",
+          "questions": [
+            "What could you do as a first step?",
+            "What else? (ask this 3+ times)",
+            "What would you do if you had unlimited resources?",
+            "What would you advise someone else in this situation?",
+            "Which option excites you most?",
+            "Which option is most likely to succeed?"
+          ]
+        },
+        "will": {
+          "purpose": "Commit to specific action",
+          "questions": [
+            "Which option will you pursue?",
+            "When specifically will you do this?",
+            "What might get in the way, and how will you handle it?",
+            "On a scale of 1-10, how committed are you?",
+            "What support do you need?",
+            "What's the very first step you'll take?"
+          ]
+        }
+      }
+    },
+    "okr": {
+      "name": "OKRs (Objectives & Key Results)",
+      "description": "Ambitious objectives tracked with measurable key results",
+      "best_for": "Complex multi-faceted goals that need measurable tracking. Projects with multiple workstreams",
+      "structure": {
+        "objective": {
+          "rules": [
+            "Qualitative and inspirational",
+            "Ambitious but not impossible",
+            "Time-bound (usually quarterly)",
+            "Actionable by the team/person"
+          ],
+          "template": "We will [verb] [what] by [when]"
+        },
+        "key_results": {
+          "rules": [
+            "3-5 per objective",
+            "Quantitative and measurable",
+            "Difficult but achievable (70% hit rate is ideal)",
+            "No tasks — outcomes only"
+          ],
+          "template": "[Metric] from [current] to [target]",
+          "scoring": "0.0 = no progress, 0.3 = some progress, 0.7 = good delivery, 1.0 = exceptional"
+        }
+      },
+      "conversion_prompt": "Help the user define 1 clear Objective and 3-5 measurable Key Results. Each KR should have a current baseline and target number."
+    }
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "id": "conflict",
+  "name": "Conflict Resolution & Internal Integration",
+  "category": "emotional_health",
+  "description": "Drama Triangle and Internal Family Systems for resolving interpersonal and internal conflicts.",
+  "when_to_use": [
+    "User is describing a relationship conflict",
+    "Agents are in disagreement about approach",
+    "User exhibits self-sabotaging patterns",
+    "Task involves internal resistance or competing priorities",
+    "User is stuck between conflicting desires or obligations"
+  ],
+  "frameworks": {
+    "drama_triangle": {
+      "name": "Drama Triangle (Karpman)",
+      "description": "Three dysfunctional roles in conflict: Victim, Persecutor, Rescuer. Recognition is the first step to breaking free.",
+      "best_for": "Interpersonal conflicts, recognizing dysfunctional dynamics, communication breakdowns",
+      "roles": {
+        "victim": {
+          "description": "Feels helpless, oppressed, powerless. 'Poor me.'",
+          "signals": ["Helplessness language", "Blame without action", "Seeking rescue rather than solutions"],
+          "empowerment_shift": "Creator — 'What outcome do I want, and what can I do to move toward it?'"
+        },
+        "persecutor": {
+          "description": "Critical, controlling, blaming. 'It's your fault.'",
+          "signals": ["Blame and criticism", "Rigid rules and punishment", "Controlling behavior"],
+          "empowerment_shift": "Challenger — 'How can I set boundaries and express needs without attacking?'"
+        },
+        "rescuer": {
+          "description": "Overhelping, enabling, fixing. 'Let me save you.'",
+          "signals": ["Taking over others' responsibilities", "Unsolicited advice", "Neglecting own needs"],
+          "empowerment_shift": "Coach — 'How can I support without disempowering? Help them build their own capability.'"
+        }
+      },
+      "empowerment_dynamic": {
+        "description": "The healthy alternative: Creator, Challenger, Coach",
+        "creator": "Takes ownership of outcomes and choices",
+        "challenger": "Provokes growth through honest feedback, not attacks",
+        "coach": "Asks questions that help others find their own solutions"
+      },
+      "detection_questions": [
+        "Is someone in this situation feeling powerless? (Victim role)",
+        "Is someone being blamed or blaming? (Persecutor role)",
+        "Is someone trying to fix things for someone who hasn't asked? (Rescuer role)",
+        "What would the empowered version of each role look like here?"
+      ]
+    },
+    "ifs": {
+      "name": "Internal Family Systems (simplified)",
+      "description": "The mind has different 'parts' with different agendas. Integration comes from understanding and respecting each part's intention.",
+      "best_for": "Internal conflict, self-sabotage, competing desires, procrastination, resistance",
+      "core_concept": "Every 'part' of you has a positive intention, even the ones that seem destructive. The inner critic is trying to protect you. The procrastinator is trying to avoid pain. Understanding the intention allows integration.",
+      "common_parts": {
+        "inner_critic": {
+          "behavior": "Harsh self-judgment, perfectionism, 'you're not good enough'",
+          "positive_intention": "Trying to protect from failure and rejection by holding to high standards",
+          "integration": "Acknowledge the protection, then ask: is this level of criticism helping or hurting?"
+        },
+        "protector": {
+          "behavior": "Avoidance, procrastination, distraction",
+          "positive_intention": "Trying to prevent emotional pain or overwhelm",
+          "integration": "What specific pain is being avoided? Is there a way to approach it safely?"
+        },
+        "achiever": {
+          "behavior": "Overwork, inability to rest, constant productivity",
+          "positive_intention": "Trying to prove worth and create safety through accomplishment",
+          "integration": "Worth isn't conditional on output. What would 'enough' look like?"
+        },
+        "rebel": {
+          "behavior": "Resistance to structure, breaking commitments, defiance",
+          "positive_intention": "Trying to preserve autonomy and authenticity",
+          "integration": "What freedom is being sought? Can we build it into the plan rather than fighting it?"
+        }
+      },
+      "process": [
+        {
+          "step": 1,
+          "name": "Identify",
+          "prompt": "What conflicting desires or impulses are present? Name them."
+        },
+        {
+          "step": 2,
+          "name": "Understand",
+          "prompt": "What is each part trying to protect or achieve? What's the positive intention?"
+        },
+        {
+          "step": 3,
+          "name": "Appreciate",
+          "prompt": "Acknowledge that each part is trying to help, even if the method is counterproductive."
+        },
+        {
+          "step": 4,
+          "name": "Negotiate",
+          "prompt": "Is there a path that honors what each part needs? What would a both/and solution look like?"
+        },
+        {
+          "step": 5,
+          "name": "Integrate",
+          "prompt": "Commit to an action plan that addresses the core needs of all parts."
+        }
+      ]
+    }
+  }
+}

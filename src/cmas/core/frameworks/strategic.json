@@ -1,0 +1,166 @@
+{
+  "id": "strategic",
+  "name": "Strategic & Leadership Frameworks",
+  "category": "leadership",
+  "description": "SWOT Analysis, Eisenhower Matrix, 80/20 Principle, and 7 Habits for strategic decision-making.",
+  "when_to_use": [
+    "Agent needs to prioritize competing tasks or options",
+    "User needs strategic clarity on a business or life decision",
+    "Orchestrator is allocating resources across agents",
+    "Task involves evaluating strengths/weaknesses of an approach",
+    "User is overwhelmed and needs to focus on what matters most"
+  ],
+  "frameworks": {
+    "swot": {
+      "name": "SWOT Analysis",
+      "description": "Evaluate any situation, plan, or entity across four dimensions",
+      "best_for": "Decision-making, competitive analysis, self-assessment, project evaluation",
+      "dimensions": {
+        "strengths": {
+          "description": "Internal positive attributes and resources",
+          "questions": [
+            "What advantages do we have?",
+            "What do we do well?",
+            "What unique resources do we have access to?",
+            "What do others see as our strengths?"
+          ]
+        },
+        "weaknesses": {
+          "description": "Internal negative attributes and limitations",
+          "questions": [
+            "What could we improve?",
+            "Where do we have fewer resources than needed?",
+            "What are others likely to see as weaknesses?",
+            "What gaps in knowledge or capability exist?"
+          ]
+        },
+        "opportunities": {
+          "description": "External favorable conditions to exploit",
+          "questions": [
+            "What trends could we take advantage of?",
+            "What needs are currently unmet?",
+            "What changes in the environment favor us?",
+            "What partnerships or resources could we leverage?"
+          ]
+        },
+        "threats": {
+          "description": "External unfavorable conditions to defend against",
+          "questions": [
+            "What obstacles do we face?",
+            "What is the competition doing?",
+            "What risks could derail us?",
+            "What changes in the environment could hurt us?"
+          ]
+        }
+      },
+      "action_prompt": "After mapping all four quadrants: How can Strengths exploit Opportunities? How can Strengths counter Threats? How can we address Weaknesses that expose us to Threats?"
+    },
+    "eisenhower": {
+      "name": "Eisenhower Matrix",
+      "description": "Prioritize by urgency vs. importance to focus on what truly moves the needle",
+      "best_for": "Task triage, daily/weekly planning, overcoming reactive patterns",
+      "quadrants": {
+        "q1_urgent_important": {
+          "label": "DO FIRST",
+          "description": "Crises, deadlines, critical problems",
+          "action": "Handle immediately. These are genuine emergencies.",
+          "agent_signal": "Task has explicit deadline AND high impact on core objective"
+        },
+        "q2_not_urgent_important": {
+          "label": "SCHEDULE",
+          "description": "Strategic planning, skill building, relationship development, prevention",
+          "action": "This is where the real leverage lives. Block dedicated time.",
+          "agent_signal": "No immediate deadline but directly advances the user's stated goals or prevents future problems"
+        },
+        "q3_urgent_not_important": {
+          "label": "DELEGATE",
+          "description": "Interruptions, most meetings, others' priorities disguised as yours",
+          "action": "Delegate or batch. These feel urgent but don't advance YOUR goals.",
+          "agent_signal": "Someone else's deadline or a process requirement, not tied to core objective"
+        },
+        "q4_not_urgent_not_important": {
+          "label": "ELIMINATE",
+          "description": "Time wasters, busywork, pleasant but unproductive activities",
+          "action": "Cut these ruthlessly. They consume time that Q2 needs.",
+          "agent_signal": "Neither deadline-driven nor goal-aligned. Feels productive but isn't"
+        }
+      },
+      "triage_prompt": "For each task, ask: (1) Does this MUST happen within 48 hours? (2) Does it directly advance the primary objective? Place in the appropriate quadrant."
+    },
+    "pareto": {
+      "name": "80/20 Principle (Pareto)",
+      "description": "80% of results come from 20% of efforts. Identify and focus on high-leverage activities.",
+      "best_for": "Resource allocation, effort optimization, finding the vital few among the trivial many",
+      "application_steps": [
+        {
+          "step": 1,
+          "action": "List all activities/tasks/inputs related to the goal"
+        },
+        {
+          "step": 2,
+          "action": "For each, estimate its contribution to the desired outcome (high/medium/low)"
+        },
+        {
+          "step": 3,
+          "action": "Identify the top 20% that drive 80% of results"
+        },
+        {
+          "step": 4,
+          "action": "Increase time/energy/resources on the vital 20%"
+        },
+        {
+          "step": 5,
+          "action": "Reduce, delegate, or eliminate the trivial 80%"
+        }
+      ],
+      "questions": [
+        "Which 20% of our efforts are producing 80% of our results?",
+        "Which activities feel productive but produce minimal outcomes?",
+        "If we could only do 3 things this week, which would have the most impact?",
+        "What's the one thing that, if done well, makes everything else easier or unnecessary?"
+      ]
+    },
+    "seven_habits": {
+      "name": "The 7 Habits (Covey)",
+      "description": "Principles-based framework covering proactivity, prioritization, collaboration, and renewal",
+      "best_for": "Holistic personal/professional development, building sustainable effectiveness",
+      "habits": {
+        "be_proactive": {
+          "principle": "Focus on what you CAN control (Circle of Influence), not what you can't (Circle of Concern)",
+          "agent_application": "Identify which aspects of the task are within the agent's control. Stop worrying about external factors.",
+          "question": "What can we actually influence here vs. what are we wasting energy worrying about?"
+        },
+        "begin_with_end_in_mind": {
+          "principle": "Start from the desired end state and work backward",
+          "agent_application": "Define the finished output before planning the work. What does 'done' look like?",
+          "question": "If this task were perfectly complete, what would the user see?"
+        },
+        "put_first_things_first": {
+          "principle": "Prioritize the important over the urgent (Quadrant 2 focus)",
+          "agent_application": "Use the Eisenhower Matrix. Resist the pull of urgent-but-unimportant tasks.",
+          "question": "Is this the most important thing we could be doing right now?"
+        },
+        "think_win_win": {
+          "principle": "Seek mutually beneficial outcomes in all interactions",
+          "agent_application": "When agents collaborate, ensure both benefit from the exchange. No zero-sum thinking.",
+          "question": "How can this interaction benefit both parties?"
+        },
+        "seek_first_to_understand": {
+          "principle": "Listen deeply before responding. Empathic listening before advice.",
+          "agent_application": "Fully understand the user's request and context before proposing solutions.",
+          "question": "Have we truly understood what the user needs, or are we projecting?"
+        },
+        "synergize": {
+          "principle": "The whole is greater than the sum of parts. Creative cooperation.",
+          "agent_application": "Combine different agents' outputs into something none could produce alone.",
+          "question": "How can we combine these perspectives into something greater?"
+        },
+        "sharpen_the_saw": {
+          "principle": "Regular renewal across physical, mental, social, and spiritual dimensions",
+          "agent_application": "Regular reflection cycles. Store lessons learned. Improve processes over time.",
+          "question": "What have we learned from this task that improves future performance?"
+        }
+      }
+    }
+  }
+}

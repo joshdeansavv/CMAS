@@ -27,6 +27,7 @@ reports/
 *.db
 *.csv
 *.json
+!src/cmas/core/frameworks/*.json
 project_*/
 .env
 config.yaml

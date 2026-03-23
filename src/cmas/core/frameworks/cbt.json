@@ -1,0 +1,145 @@
+{
+  "id": "cbt",
+  "name": "Cognitive Behavioral Therapy",
+  "category": "mindset",
+  "description": "Identifies the link between thoughts, feelings, and behaviors. Teaches reframing of distorted thinking patterns.",
+  "when_to_use": [
+    "Agent or user is stuck in circular reasoning",
+    "Task involves overcoming resistance or mental blocks",
+    "Planning keeps failing due to assumptions",
+    "User expresses frustration, helplessness, or catastrophizing",
+    "Agent needs to challenge its own flawed reasoning chain"
+  ],
+  "cognitive_distortions": {
+    "all_or_nothing": {
+      "name": "All-or-Nothing Thinking",
+      "description": "Seeing things in black-and-white categories with no middle ground",
+      "agent_example": "If I can't find the perfect solution, there's no point trying",
+      "reframe": "Partial progress is still progress. What's the best achievable outcome?"
+    },
+    "catastrophizing": {
+      "name": "Catastrophizing",
+      "description": "Expecting the worst possible outcome without evidence",
+      "agent_example": "This approach will definitely fail because one variable is uncertain",
+      "reframe": "What is the actual probability of failure? What evidence supports success?"
+    },
+    "mental_filter": {
+      "name": "Mental Filter",
+      "description": "Focusing exclusively on negatives while ignoring positives",
+      "agent_example": "3 of 5 data points support the hypothesis, but the 2 that don't must mean it's wrong",
+      "reframe": "What does the full picture look like? What's the weight of evidence?"
+    },
+    "overgeneralization": {
+      "name": "Overgeneralization",
+      "description": "Drawing broad conclusions from a single event",
+      "agent_example": "The last similar task failed, so this one will too",
+      "reframe": "What specific factors are different this time? What can be adjusted?"
+    },
+    "should_statements": {
+      "name": "Should Statements",
+      "description": "Rigid rules about how things must be",
+      "agent_example": "The user should have provided more context before asking",
+      "reframe": "Work with what's available. What clarifying questions would help?"
+    },
+    "jumping_to_conclusions": {
+      "name": "Jumping to Conclusions",
+      "description": "Making assumptions without sufficient evidence",
+      "agent_example": "The user probably wants X even though they said Y",
+      "reframe": "What did the user actually say? What evidence supports this interpretation?"
+    },
+    "emotional_reasoning": {
+      "name": "Emotional Reasoning",
+      "description": "Assuming feelings reflect reality",
+      "agent_example": "This feels too complex, therefore it IS too complex",
+      "reframe": "Complexity is a perception. Break it into components — is each one manageable?"
+    },
+    "disqualifying_the_positive": {
+      "name": "Disqualifying the Positive",
+      "description": "Dismissing positive evidence or progress",
+      "agent_example": "We made progress on 4 sub-tasks but the 5th is stuck, so we've failed",
+      "reframe": "Acknowledge what HAS been accomplished. How can we build on that momentum?"
+    }
+  },
+  "socratic_questions": {
+    "examining_evidence": [
+      "What evidence supports this conclusion?",
+      "What evidence contradicts this conclusion?",
+      "Are we confusing a thought with a fact?",
+      "What would we say to another agent who had this thought?",
+      "What's the strongest piece of evidence on each side?"
+    ],
+    "exploring_alternatives": [
+      "Is there an alternative explanation?",
+      "What are at least three other ways to interpret this?",
+      "If we set aside our first assumption, what else could be true?",
+      "What would a specialist in this domain say about this?",
+      "What approach haven't we tried yet?"
+    ],
+    "examining_consequences": [
+      "What's the worst that could realistically happen?",
+      "What's the best that could realistically happen?",
+      "What's the most likely outcome?",
+      "If the worst happens, what could we do about it?",
+      "Will this matter in the final output?"
+    ],
+    "questioning_assumptions": [
+      "What are we assuming that we haven't verified?",
+      "What would happen if our assumption is wrong?",
+      "Where did this assumption come from?",
+      "Is this assumption based on evidence or habit?",
+      "What would we need to see to change our mind?"
+    ],
+    "testing_reasoning": [
+      "Is our reasoning logically valid, or are we skipping steps?",
+      "Could someone reach a different conclusion from the same data?",
+      "Are we being influenced by a previous failure?",
+      "What's the weakest link in our chain of reasoning?",
+      "If we had to defend this conclusion to a critic, where would they attack?"
+    ]
+  },
+  "thought_record": {
+    "description": "A structured process for examining and reframing problematic thinking",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Identify the situation",
+        "prompt": "What specific situation or task triggered this thinking pattern?"
+      },
+      {
+        "step": 2,
+        "name": "Identify the automatic thought",
+        "prompt": "What was the immediate, unexamined thought or assumption?"
+      },
+      {
+        "step": 3,
+        "name": "Identify the distortion",
+        "prompt": "Which cognitive distortion does this thought reflect?"
+      },
+      {
+        "step": 4,
+        "name": "Examine the evidence",
+        "prompt": "What concrete evidence supports AND contradicts this thought?"
+      },
+      {
+        "step": 5,
+        "name": "Generate a balanced thought",
+        "prompt": "What's a more accurate, evidence-based way to think about this?"
+      },
+      {
+        "step": 6,
+        "name": "Plan action",
+        "prompt": "Based on the balanced thought, what's the most effective next step?"
+      }
+    ]
+  },
+  "behavioral_activation": {
+    "description": "When stuck or avoidant, schedule specific small actions rather than waiting for motivation",
+    "protocol": [
+      "Identify the avoided task or decision",
+      "Break it into the smallest possible first step",
+      "Assign a concrete action with no ambiguity",
+      "Execute the micro-step immediately",
+      "Evaluate: did taking action reduce the perceived difficulty?"
+    ]
+  }
+}

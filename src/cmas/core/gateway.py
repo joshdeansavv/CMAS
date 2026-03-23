@@ -22,11 +22,11 @@ from .state import Hub
 
 # Default permissions: which agent types can use which tools
 DEFAULT_PERMISSIONS = {
-    "ResearchAgent": {"web_search", "write_file", "read_file", "list_files", "run_python", "send_message"},
-    "AnalystAgent":  {"web_search", "write_file", "read_file", "list_files", "run_python", "send_message"},
-    "WriterAgent":   {"write_file", "read_file", "list_files", "run_python", "send_message"},
+    "ResearchAgent": {"web_search", "write_file", "read_file", "list_files", "run_python", "send_message", "apply_framework"},
+    "AnalystAgent":  {"web_search", "write_file", "read_file", "list_files", "run_python", "send_message", "apply_framework"},
+    "WriterAgent":   {"write_file", "read_file", "list_files", "run_python", "send_message", "apply_framework"},
     # Specialists get everything by default
-    "_default":      {"web_search", "write_file", "read_file", "list_files", "run_python", "send_message"},
+    "_default":      {"web_search", "write_file", "read_file", "list_files", "run_python", "send_message", "apply_framework"},
 }
 
 
@@ -436,6 +436,11 @@ class Gateway:
         async def send_message(recipient: str, content: str) -> str:
             return await gateway.route_message(agent_name, recipient, content)
 
+        async def apply_framework(context: str, framework_id: str = "", component: str = "") -> str:
+            return await gateway.invoke_tool(agent_name, "apply_framework", {
+                "context": context, "framework_id": framework_id, "component": component
+            })
+
         return {
             "web_search": web_search,
             "write_file": write_file,
@@ -443,6 +448,7 @@ class Gateway:
             "list_files": list_files,
             "run_python": run_python,
             "send_message": send_message,
+            "apply_framework": apply_framework,
         }
 
     # ── Chat Message Routing (session-aware) ────────────────────

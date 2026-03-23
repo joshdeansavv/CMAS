@@ -8,6 +8,12 @@ import aiohttp
 from pathlib import Path
 from dotenv import load_dotenv
 
+from .frameworks import (
+    select_and_apply as _fw_select_and_apply,
+    apply_framework as _fw_apply,
+    list_frameworks as _fw_list,
+)
+
 load_dotenv()
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
@@ -115,6 +121,27 @@ async def run_python(code: str) -> str:
         return "Error: execution timed out after 60s"
     except Exception as e:
         return f"Error: {e}"
+
+
+# ── Frameworks ───────────────────────────────────────────────────────
+
+async def apply_framework(
+    context: str,
+    framework_id: str = "",
+    component: str = "",
+) -> str:
+    """Apply an evidence-based coaching/transformation framework.
+
+    If framework_id is empty, auto-detects the best framework from context.
+    """
+    if framework_id:
+        return _fw_apply(framework_id, context, component)
+    return _fw_select_and_apply(context)
+
+
+async def list_available_frameworks() -> str:
+    """List all available frameworks."""
+    return json.dumps(_fw_list(), indent=2)
 
 
 # ── Tool Registry ────────────────────────────────────────────────────
@@ -238,6 +265,45 @@ TOOL_DEFS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "apply_framework",
+            "description": (
+                "Apply an evidence-based coaching or transformation framework to the current situation. "
+                "Auto-detects the best framework if none specified. Available frameworks: "
+                "CBT (cognitive distortions, Socratic questioning), ACT (acceptance, values-based action), "
+                "DBT (distress tolerance, emotional regulation, DEAR MAN communication), "
+                "Stages of Change (readiness assessment), Goal Setting (SMART, HARD, GROW, OKR), "
+                "Strategic (SWOT, Eisenhower Matrix, 80/20 Pareto, 7 Habits), "
+                "Behavioral (Habit Loop, Fogg Model, Four Tendencies), "
+                "Financial (Wealth Pyramid, Profit First, Cashflow Quadrant), "
+                "Conflict (Drama Triangle, Internal Family Systems), "
+                "NLP (reframing, meta model, outcome specification). "
+                "Use this when the task involves personal development, goal setting, behavioral change, "
+                "strategic decisions, conflict resolution, or overcoming mental blocks."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "context": {
+                        "type": "string",
+                        "description": "Description of the current situation, problem, or goal the framework should address"
+                    },
+                    "framework_id": {
+                        "type": "string",
+                        "description": "Optional: specific framework ID (cbt, act, dbt, stages_of_change, goal_setting, strategic, behavioral, financial, conflict, nlp). Leave empty for auto-detection.",
+                        "enum": ["", "cbt", "act", "dbt", "stages_of_change", "goal_setting", "strategic", "behavioral", "financial", "conflict", "nlp"]
+                    },
+                    "component": {
+                        "type": "string",
+                        "description": "Optional: specific component within the framework (e.g., 'socratic_questions', 'smart', 'eisenhower', 'habit_loop', 'dear_man', 'drama_triangle')"
+                    },
+                },
+                "required": ["context"],
+            },
+        },
+    },
 ]
 
 # Map function names to handlers
@@ -248,4 +314,5 @@ TOOL_HANDLERS = {
     "list_files": list_files,
     "run_python": run_python,
     "run_command": run_command,
+    "apply_framework": apply_framework,
 }

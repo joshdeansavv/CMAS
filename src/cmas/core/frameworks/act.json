@@ -1,0 +1,105 @@
+{
+  "id": "act",
+  "name": "Acceptance and Commitment Therapy",
+  "category": "emotional_health",
+  "description": "Teaches psychological flexibility by accepting difficult states rather than fighting them, and committing to values-based action regardless.",
+  "when_to_use": [
+    "Agent is stuck trying to eliminate uncertainty before acting",
+    "User is paralyzed by perfectionism or fear of failure",
+    "Task involves making decisions with incomplete information",
+    "Agent keeps re-analyzing instead of executing",
+    "Situation requires moving forward despite discomfort or ambiguity"
+  ],
+  "core_processes": {
+    "acceptance": {
+      "description": "Actively embracing difficult thoughts/feelings without trying to change them",
+      "agent_application": "Accept that uncertainty, incomplete data, or imperfect tools are part of the task — stop trying to eliminate them before acting",
+      "questions": [
+        "What are we trying to avoid or eliminate before we feel 'ready' to act?",
+        "What if we accepted this uncertainty and acted anyway?",
+        "Is the effort to remove this discomfort costing more than the discomfort itself?",
+        "What would we do right now if we stopped waiting for perfect conditions?"
+      ]
+    },
+    "cognitive_defusion": {
+      "description": "Seeing thoughts as just thoughts, not literal truths",
+      "agent_application": "Recognize that 'this won't work' is a prediction, not a fact. Treat assumptions as hypotheses to test, not truths to obey",
+      "questions": [
+        "Is this a fact or a prediction?",
+        "If we label this as 'just a thought,' does it still control our next step?",
+        "How would our approach change if we treated this belief as a hypothesis to test?",
+        "What would we do if we didn't believe this thought?"
+      ]
+    },
+    "present_moment": {
+      "description": "Full contact with the here-and-now rather than ruminating on past failures or future worries",
+      "agent_application": "Focus on what CAN be done right now with available resources, not what went wrong before or might go wrong later",
+      "questions": [
+        "What resources and information do we actually have right now?",
+        "What is the single most impactful action we can take in this moment?",
+        "Are we solving the current problem or relitigating a past one?",
+        "What's happening now vs. what we're projecting will happen?"
+      ]
+    },
+    "values_clarification": {
+      "description": "Identifying what matters most to guide action",
+      "agent_application": "Reconnect with the core objective — what does the user actually need? What outcome truly matters?",
+      "questions": [
+        "What is the core outcome the user needs from this task?",
+        "If we could only deliver one thing, what would matter most?",
+        "Are our current actions aligned with the stated objective, or have we drifted?",
+        "What would 'good enough to be genuinely useful' look like?"
+      ]
+    },
+    "committed_action": {
+      "description": "Taking concrete steps guided by values, even when difficult",
+      "agent_application": "Choose a direction and execute. Imperfect action beats perfect planning",
+      "questions": [
+        "What is one concrete step we can commit to right now?",
+        "Are we willing to take this step even if the outcome is uncertain?",
+        "What's the smallest action that moves us toward the objective?",
+        "If we commit to this path, what does the next hour look like?"
+      ]
+    },
+    "self_as_context": {
+      "description": "Observing your own process from a meta-perspective",
+      "agent_application": "Step back and observe the agent's own reasoning process — is it productive or spinning?",
+      "questions": [
+        "If we observed our own process from the outside, what would we notice?",
+        "Are we making progress or just generating more analysis?",
+        "What pattern keeps repeating in how we approach this?",
+        "What would a fresh agent with no prior context do differently?"
+      ]
+    }
+  },
+  "flexibility_protocol": {
+    "description": "When an agent or process is rigid/stuck, use this sequence to restore psychological flexibility",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Notice",
+        "prompt": "What's happening right now? What thoughts, predictions, or hesitations are present?"
+      },
+      {
+        "step": 2,
+        "name": "Accept",
+        "prompt": "Can we make room for this difficulty without needing to fix it first?"
+      },
+      {
+        "step": 3,
+        "name": "Defuse",
+        "prompt": "What if this thought is just a thought, not a command? What would we do if we didn't take it literally?"
+      },
+      {
+        "step": 4,
+        "name": "Reconnect",
+        "prompt": "What does the user actually need? What value or outcome are we serving?"
+      },
+      {
+        "step": 5,
+        "name": "Commit",
+        "prompt": "What is one concrete action we will take right now, regardless of discomfort?"
+      }
+    ]
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "id": "nlp",
+  "name": "Neuro-Linguistic Programming (Communication Model)",
+  "category": "mindset",
+  "description": "Communication and behavioral patterns that shape how language influences thinking and outcomes.",
+  "when_to_use": [
+    "Agent needs to reframe a problem for the user",
+    "User's language reveals limiting beliefs",
+    "Task requires persuasive or motivating communication",
+    "Agent needs to calibrate communication style to the user",
+    "Shifting perspective is needed to unlock a solution"
+  ],
+  "techniques": {
+    "reframing": {
+      "description": "Changing the meaning of a situation by changing the frame around it",
+      "types": {
+        "context_reframe": {
+          "description": "The same behavior/trait is valuable in a different context",
+          "template": "That [trait/behavior] would be really valuable when [different context]",
+          "example": "Being extremely detail-oriented feels slow for brainstorming, but it's exactly what's needed for quality assurance"
+        },
+        "meaning_reframe": {
+          "description": "Assign a different meaning to the same situation",
+          "template": "Instead of meaning [negative], this could mean [positive/neutral]",
+          "example": "The client's pushback doesn't mean rejection — it means they care enough to engage deeply"
+        }
+      },
+      "agent_prompts": [
+        "What's another way to interpret this situation?",
+        "In what context would this 'weakness' be a strength?",
+        "What meaning is the user assigning to this, and is there a more useful one?"
+      ]
+    },
+    "meta_model": {
+      "description": "Precise questions to challenge vague, distorted, or generalized language",
+      "patterns": {
+        "deletion": {
+          "description": "Important information is left out",
+          "examples": ["'I'm stuck'", "'It's not working'", "'They don't understand'"],
+          "challenges": [
+            "Stuck on what specifically?",
+            "What specifically isn't working?",
+            "What specifically don't they understand?"
+          ]
+        },
+        "generalization": {
+          "description": "One experience becomes a universal rule",
+          "examples": ["'I always fail at this'", "'Nobody ever listens'", "'This never works'"],
+          "challenges": [
+            "Always? Has there ever been an exception?",
+            "Nobody? Not a single person?",
+            "Never? What about [specific counter-example]?"
+          ]
+        },
+        "distortion": {
+          "description": "Cause-effect or mind-reading without evidence",
+          "examples": ["'They made me feel...'", "'I know they think...'", "'If I do X, Y will definitely happen'"],
+          "challenges": [
+            "How specifically did they cause that feeling?",
+            "How do you know what they think? Have you asked?",
+            "What evidence supports that Y will definitely happen?"
+          ]
+        }
+      }
+    },
+    "anchoring": {
+      "description": "Associating a positive state with a specific trigger for future access",
+      "agent_application": "When the user achieves a win or breakthrough, anchor it — reference it in future conversations to restore that confident state",
+      "protocol": [
+        "Identify a peak state (confidence, clarity, motivation)",
+        "Name it and make it vivid ('Remember when you [specific achievement]?')",
+        "Create a reference point the user can return to",
+        "In future sessions, recall the anchor when the user needs that state"
+      ]
+    },
+    "outcome_specification": {
+      "description": "Well-formed outcomes have specific structure",
+      "questions": [
+        "What specifically do you want? (stated positively, not what you DON'T want)",
+        "How will you know when you have it? (sensory evidence)",
+        "Where, when, and with whom do you want it?",
+        "What will you gain AND what might you lose?",
+        "What resources do you already have?",
+        "What's the first step?"
+      ]
+    }
+  }
+}

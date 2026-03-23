@@ -1,0 +1,140 @@
+{
+  "id": "behavioral",
+  "name": "Behavioral Change & Habit Frameworks",
+  "category": "behavioral",
+  "description": "Habit Loop, Fogg Behavior Model, and Four Tendencies for designing and sustaining behavioral change.",
+  "when_to_use": [
+    "User wants to build or break a habit",
+    "Task involves creating sustainable routines or systems",
+    "Agent needs to design a behavior change intervention",
+    "User keeps starting but not sustaining new practices",
+    "Need to understand why someone resists or follows through on commitments"
+  ],
+  "frameworks": {
+    "habit_loop": {
+      "name": "The Habit Loop (Charles Duhigg)",
+      "description": "Every habit follows: Cue → Routine → Reward. Understanding this loop is the foundation for change.",
+      "best_for": "Breaking bad habits, installing new habits, understanding automatic behaviors",
+      "components": {
+        "cue": {
+          "description": "The trigger that initiates the behavior",
+          "types": ["time", "location", "emotional_state", "other_people", "preceding_action"],
+          "questions": [
+            "What triggers this behavior? When does it happen?",
+            "What time of day? Where? Who is around?",
+            "What emotion or state precedes it?",
+            "What action immediately precedes it?"
+          ]
+        },
+        "routine": {
+          "description": "The behavior itself — the habit you want to change or install",
+          "questions": [
+            "What is the exact behavior?",
+            "How long does it take?",
+            "What does it look like step by step?",
+            "Can this routine be made simpler or replaced with a better one?"
+          ]
+        },
+        "reward": {
+          "description": "The benefit that reinforces the behavior",
+          "questions": [
+            "What need does this behavior satisfy?",
+            "What feeling do you get during or after?",
+            "Could a different routine provide the same reward?",
+            "Is the reward immediate or delayed? (Immediate rewards drive habit formation)"
+          ]
+        }
+      },
+      "change_protocol": [
+        "Identify the routine you want to change",
+        "Experiment with different rewards to find what craving drives the habit",
+        "Isolate the cue (time, place, emotion, people, preceding action)",
+        "Create a plan: When [CUE], I will [NEW ROUTINE] because it provides [REWARD]",
+        "Track consistency for 21+ days"
+      ]
+    },
+    "fogg": {
+      "name": "Fogg Behavior Model (BJ Fogg)",
+      "description": "Behavior = Motivation + Ability + Prompt. All three must converge at the same moment.",
+      "best_for": "Designing new behaviors, understanding why behaviors fail, making change easy",
+      "components": {
+        "motivation": {
+          "description": "The desire to do the behavior",
+          "levels": ["high", "medium", "low"],
+          "boosters": [
+            "Connect to something they already care about",
+            "Make the outcome vivid and personal",
+            "Use social proof or accountability",
+            "Reduce the gap between effort and reward"
+          ]
+        },
+        "ability": {
+          "description": "How easy the behavior is to do",
+          "simplicity_factors": [
+            "Time — how long does it take?",
+            "Money — what does it cost?",
+            "Physical effort — how hard is it?",
+            "Mental effort — how much thinking is required?",
+            "Social deviance — does it go against norms?",
+            "Routine disruption — does it break existing patterns?"
+          ],
+          "make_easier": [
+            "Shrink the behavior to its tiniest version",
+            "Remove friction and obstacles",
+            "Create a starter step (2-minute rule)",
+            "Prepare the environment in advance"
+          ]
+        },
+        "prompt": {
+          "description": "The signal to do the behavior NOW",
+          "types": {
+            "external": "Alarms, notifications, environmental cues",
+            "internal": "Feelings, thoughts, existing routines",
+            "action": "Anchor to an existing habit (after I [existing], I will [new])"
+          },
+          "design_principle": "The best prompt is an existing behavior you already do reliably"
+        }
+      },
+      "tiny_habits_recipe": "After I [ANCHOR HABIT], I will [TINY NEW BEHAVIOR]. Then I celebrate.",
+      "failure_diagnosis": [
+        "If behavior isn't happening: which component is missing?",
+        "Low motivation → make it more meaningful or connected to values",
+        "Low ability → make it easier, smaller, remove barriers",
+        "No prompt → attach to an existing reliable cue"
+      ]
+    },
+    "four_tendencies": {
+      "name": "The Four Tendencies (Gretchen Rubin)",
+      "description": "How people respond to inner and outer expectations determines which strategies work for them.",
+      "best_for": "Personalizing habit and accountability strategies based on how someone is motivated",
+      "tendencies": {
+        "upholder": {
+          "description": "Meets both outer and inner expectations. Self-motivated, follows through.",
+          "strategy": "Give clear expectations and let them execute. They thrive with structure.",
+          "pitfall": "Can be rigid. May need permission to adapt or break rules when appropriate."
+        },
+        "questioner": {
+          "description": "Meets inner expectations, resists outer. Needs to understand WHY.",
+          "strategy": "Always explain the reasoning. Provide data and evidence. Let them customize.",
+          "pitfall": "Analysis paralysis. May need a deadline to stop researching and start acting."
+        },
+        "obliger": {
+          "description": "Meets outer expectations, struggles with inner. Needs external accountability.",
+          "strategy": "Build in accountability partners, deadlines, and check-ins. Make commitments to others.",
+          "pitfall": "Can burn out serving others. Needs permission to prioritize self."
+        },
+        "rebel": {
+          "description": "Resists both inner and outer expectations. Driven by identity and freedom.",
+          "strategy": "Frame as identity ('I'm the kind of person who...'), not obligation. Offer choices, never ultimatums.",
+          "pitfall": "May resist even their own goals. Needs autonomy and variety."
+        }
+      },
+      "detection_questions": [
+        "Do you follow through on commitments to yourself as easily as commitments to others?",
+        "Do you need to understand WHY before you'll do something?",
+        "Do you find it easier to keep promises to others than to yourself?",
+        "Do you resist expectations even when they come from yourself?"
+      ]
+    }
+  }
+}

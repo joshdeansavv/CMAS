@@ -1,0 +1,114 @@
+{
+  "id": "financial",
+  "name": "Financial Success Frameworks",
+  "category": "financial",
+  "description": "Wealth Pyramid, Profit First, and Cashflow Quadrant for financial strategy and discipline.",
+  "when_to_use": [
+    "User has financial goals or business revenue questions",
+    "Task involves budgeting, investment, or financial planning",
+    "User wants to build a business or transition income sources",
+    "Agent is analyzing financial strategies or business models"
+  ],
+  "frameworks": {
+    "wealth_pyramid": {
+      "name": "The Wealth Pyramid",
+      "description": "Structured financial growth from foundation upward. Each level must be solid before building the next.",
+      "best_for": "Personal finance planning, prioritizing financial actions, identifying gaps",
+      "levels": [
+        {
+          "level": 1,
+          "name": "Foundation — Protection",
+          "components": ["Emergency fund (3-6 months expenses)", "Insurance (health, life, disability)", "Basic estate plan (will, POA)"],
+          "question": "Is the financial foundation solid? Emergency fund? Insurance?",
+          "priority": "Build this FIRST before any investing"
+        },
+        {
+          "level": 2,
+          "name": "Security — Debt Elimination",
+          "components": ["Eliminate high-interest debt", "Build credit score", "Consistent budgeting system"],
+          "question": "Is high-interest debt cleared? Is there a budgeting system?",
+          "priority": "No investing until high-interest debt is gone"
+        },
+        {
+          "level": 3,
+          "name": "Accumulation — Investing",
+          "components": ["Retirement accounts (401k, IRA)", "Index fund investing", "Dollar-cost averaging", "Tax-advantaged accounts maximized"],
+          "question": "Are tax-advantaged retirement accounts being maximized?",
+          "priority": "Automate contributions, prioritize employer match"
+        },
+        {
+          "level": 4,
+          "name": "Growth — Asset Building",
+          "components": ["Real estate", "Business ownership", "Alternative investments", "Multiple income streams"],
+          "question": "Are assets generating income beyond a paycheck?",
+          "priority": "Build assets that produce cash flow"
+        },
+        {
+          "level": 5,
+          "name": "Preservation — Wealth Protection",
+          "components": ["Advanced tax strategies", "Asset protection", "Estate planning", "Philanthropy"],
+          "question": "Is accumulated wealth protected and tax-optimized?",
+          "priority": "Shift from growth to preservation and legacy"
+        }
+      ]
+    },
+    "profit_first": {
+      "name": "Profit First (Mike Michalowicz)",
+      "description": "Allocate profit first, then operate on what remains. A behavioral system for financial discipline.",
+      "best_for": "Business owners, freelancers, anyone whose income requires active financial discipline",
+      "core_formula": "Sales - Profit = Expenses (NOT Sales - Expenses = Profit)",
+      "allocation_accounts": {
+        "income": "All revenue deposits here first",
+        "profit": "Allocate percentage immediately (start with 1%, grow to 5-20%)",
+        "owners_pay": "Your salary — what you pay yourself consistently",
+        "tax": "Set aside estimated tax obligation",
+        "operating_expenses": "What remains funds the business"
+      },
+      "implementation_steps": [
+        "Open separate bank accounts for each allocation",
+        "On the 10th and 25th of each month, allocate from Income to other accounts",
+        "Start with small profit percentage and increase by 1% each quarter",
+        "Operating expenses must fit within what remains — this forces efficiency",
+        "Take quarterly profit distributions as a reward"
+      ],
+      "key_principle": "Parkinson's Law applied to money: expenses expand to fill available funds. By removing profit first, you force efficiency in spending."
+    },
+    "cashflow_quadrant": {
+      "name": "Cashflow Quadrant (Robert Kiyosaki)",
+      "description": "Four ways to earn income, each with different mindsets and financial outcomes.",
+      "best_for": "Career and income strategy, understanding wealth-building paths, planning transitions",
+      "quadrants": {
+        "E_employee": {
+          "description": "Trades time for money. Values security and benefits.",
+          "mindset": "I need a good job with a steady paycheck",
+          "income_type": "Linear — hours worked = income earned",
+          "path_forward": "Build skills and savings to fund transition to B or I"
+        },
+        "S_self_employed": {
+          "description": "Owns a job. Works for themselves but IS the business.",
+          "mindset": "If I want it done right, I'll do it myself",
+          "income_type": "Linear — still trading time, but with more control",
+          "path_forward": "Systematize and delegate to transition from S to B"
+        },
+        "B_business_owner": {
+          "description": "Owns a system that works without them. Leverages other people's time.",
+          "mindset": "I build systems and hire great people",
+          "income_type": "Scalable — income can grow beyond personal time investment",
+          "path_forward": "Use business profits to fund investments (I quadrant)"
+        },
+        "I_investor": {
+          "description": "Money works for them. Leverages other people's money and systems.",
+          "mindset": "I put money to work and it generates returns",
+          "income_type": "Passive — income generated by assets, not time",
+          "path_forward": "Continuously acquire and optimize income-producing assets"
+        }
+      },
+      "transition_questions": [
+        "Which quadrant are you primarily in right now?",
+        "Which quadrant do you want to be in?",
+        "What skills, systems, or capital do you need for that transition?",
+        "What's the smallest step to begin moving to the right side?"
+      ]
+    }
+  }
+}
