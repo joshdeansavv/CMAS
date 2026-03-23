@@ -45,6 +45,12 @@ from .brain import (
     DefaultModeNetwork,
 )
 from .team import Team, TeamSpec
+from .protocols import (
+    TOOL_PROFILES,
+    get_standing_orders,
+    get_depth_policy,
+    VERIFICATION_PROMPT,
+)
 
 
 # All tools an agent could possibly need — Composer allocates subsets
@@ -160,11 +166,15 @@ class Composer:
         self._print("Running MCTS strategic analysis...")
         mcts = await self.reasoner.mcts_search(goal=goal, context=prior_text)
 
+        composer_orders = get_standing_orders("composer")
+
         # CEO-level decomposition
         response = await chat(
             messages=[
                 {"role": "system", "content": f"""You are the CEO/Composer of an AI organization.
 A user has given you a goal. You must analyze it at the HIGHEST strategic level.
+
+{composer_orders}
 
 Think like a real CEO planning a company initiative:
 - What departments/teams are needed?
@@ -260,6 +270,9 @@ Rules:
 
 AVAILABLE TOOLS: {json.dumps(ALL_AVAILABLE_TOOLS)}
 AVAILABLE FRAMEWORKS: {json.dumps(ALL_AVAILABLE_FRAMEWORKS)}
+
+TOOL PROFILES (shorthand — you can assign a profile instead of listing individual tools):
+{json.dumps({k: sorted(v) for k, v in TOOL_PROFILES.items()}, indent=2)}
 
 Consider adding an Operations/HR team if >3 teams to monitor resources.
 

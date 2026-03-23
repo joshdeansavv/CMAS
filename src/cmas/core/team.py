@@ -28,6 +28,12 @@ from .state import Hub, Task, TaskStatus
 from .memory import Memory
 from .reasoning import Reasoner
 from .agent import Agent
+from .protocols import (
+    get_standing_orders,
+    build_bootstrap_context,
+    get_depth_policy,
+    get_tools_for_profile,
+)
 
 
 # ── Team Data Model ─────────────────────────────────────────────────
@@ -144,9 +150,13 @@ class Team:
             for fw_id in self.spec.frameworks[:2]:
                 framework_context += f"\n{apply_framework(fw_id, self.spec.mission)}\n"
 
+        team_lead_orders = get_standing_orders("team_lead")
+
         response = await chat(
             messages=[
                 {"role": "system", "content": f"""You are a Team Lead managing the "{self.spec.name}" team.
+
+{team_lead_orders}
 
 YOUR MISSION: {self.spec.mission}
 
@@ -244,22 +254,27 @@ Return JSON ONLY:
             self.hub.add_task(task)
             tasks[sa["id"]] = task
 
-            # Create the sub-agent
+            # Create the sub-agent with full bootstrap context
             agent_name = f"{self.spec.name}_{sa['role'].replace(' ', '_')[:25]}_{sa['id']}"
+            bootstrap = build_bootstrap_context(
+                agent_name=agent_name,
+                role=sa["role"],
+                mission=sa["task"],
+                team_name=self.spec.name,
+                depth=2,  # Sub-agents are depth 2
+                tools=sa.get("tools_needed", self.spec.tools),
+                frameworks=self.spec.frameworks,
+                standing_orders=get_standing_orders("sub_agent"),
+            )
             agent = Agent(
                 name=agent_name,
-                role=(
-                    f"You are a {sa['role']} on the '{self.spec.name}' team. "
-                    f"Your specific task: {sa['task'][:200]}. "
-                    f"You report to the Team Lead. Share your findings by saving "
-                    f"them to files and sending messages to your team."
-                ),
+                role=bootstrap,
                 hub=self.hub,
                 workspace=self.workspace / sa["id"],
                 model=self.model,
                 gateway=self.gateway,
                 memory=self.memory,
-                depth=1,  # Sub-agents are depth 1 (can still delegate up to depth 5)
+                depth=2,  # Sub-agents are depth 2 (can delegate to depth 3-5)
                 progress_callback=self.progress_callback,
             )
 
