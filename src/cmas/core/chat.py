@@ -323,11 +323,19 @@ class ChatHandler:
         self._steering_queues[session_id].put_nowait(text)
 
     def cancel_project(self, project_id: str):
-        """Cancel all running orchestrator tasks for a project."""
+        """Cancel the running orchestrator task for a project or session."""
         task = self._active_research_tasks.pop(project_id, None)
         if task and not task.done():
             task.cancel()
-            print(f"[ChatHandler] Cancelled orchestrator task for project {project_id}")
+            print(f"[ChatHandler] Cancelled orchestrator task for {project_id}")
+            return
+        # Also sweep for any tasks whose key contains this project_id
+        for key in list(self._active_research_tasks.keys()):
+            if project_id and project_id in key:
+                t = self._active_research_tasks.pop(key, None)
+                if t and not t.done():
+                    t.cancel()
+                    print(f"[ChatHandler] Cancelled orchestrator task (key={key})")
 
     def cancel_all(self):
         """Cancel every running research task — used on server shutdown."""
@@ -610,11 +618,12 @@ class ChatHandler:
 
         async def handle_deep_research(goal: str, **kw) -> str:
             await push_progress(f"Launching deep research swarm: \"{goal}\"")
-            # Cancel any existing research for this project before starting a new one
-            self.cancel_project(session.project_id)
+            # Cancel any existing research for this project/session before starting a new one
+            task_key = session.project_id or session.session_id
+            self.cancel_project(task_key)
             t = asyncio.create_task(self._run_deep_research(goal, session))
-            if session.project_id:
-                self._active_research_tasks[session.project_id] = t
+            # Always store using project_id if available, fall back to session_id
+            self._active_research_tasks[task_key] = t
             return f"Deep research launched on: **{goal}**\n\nI've deployed a multi-agent swarm to investigate this. I'll stream progress updates here and send you the full report when complete."
 
         async def handle_remember(topic: str, content: str, category: str = "note", **kw) -> str:
@@ -761,9 +770,9 @@ class ChatHandler:
     # ── Deep Research ─────────────────────────────────────────────
 
     async def _run_deep_research(self, goal: str, session: Session):
-        """Run the full orchestrator in the background and push result when done."""
+        """Run the Composer (CEO mode) in the background and push result when done."""
         try:
-            from .orchestrator import Orchestrator
+            from .composer import Composer
             from cmas.cli import get_project_dir
 
             project_dir = get_project_dir(goal)
@@ -778,19 +787,19 @@ class ChatHandler:
                     except Exception:
                         pass
 
-            orchestrator = Orchestrator(
+            composer = Composer(
                 project_dir=project_dir,
                 model=self.config.research_model,
-                agent_model=self.config.model,
-                max_iterations=3,
-                local_timezone=self.config.timezone,
+                team_model=self.config.model,
+                max_teams=8,
+                max_agents_per_team=5,
                 hub=self.gateway.hub,
                 gateway=self.gateway,
                 memory=self.memory,
                 project_id=session.project_id,
                 progress_callback=_progress,
             )
-            result = await orchestrator.run(goal)
+            result = await composer.run(goal)
 
             if self._push_callback:
                 await self._push_callback(session.session_id, session.channel, result)
@@ -815,4 +824,5 @@ class ChatHandler:
                 )
         finally:
             # Always clean up the task reference
-            self._active_research_tasks.pop(session.project_id, None)
+            task_key = session.project_id or session.session_id
+            self._active_research_tasks.pop(task_key, None)

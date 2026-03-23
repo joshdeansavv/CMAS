@@ -93,6 +93,8 @@ class CMASServer:
         app.router.add_post("/api/tasks/{task_id}/pause", self._task_control_handler)
         app.router.add_post("/api/tasks/{task_id}/resume", self._task_control_handler)
         app.router.add_post("/api/tasks/{task_id}/stop", self._task_control_handler)
+        app.router.add_get("/api/teams", self._teams_handler)
+        app.router.add_get("/api/frameworks", self._frameworks_handler)
 
         # External channels explicitly disabled to isolate localhost gateway
         return app
@@ -211,6 +213,24 @@ class CMASServer:
         else:
             return web.json_response({"error": "Unknown action"}, status=400)
         return web.json_response({"ok": True, "task_id": task_id, "action": action})
+
+    async def _teams_handler(self, request: web.Request) -> web.Response:
+        """List all active teams and their sub-agents (Composer mode)."""
+        # Teams are tracked on the ChatHandler's active composer instances
+        # For now, return team data from Hub messages
+        import json as _json
+        teams_data = self.hub.recall("composer:org_design")
+        if teams_data:
+            try:
+                return web.json_response(_json.loads(teams_data))
+            except Exception:
+                pass
+        return web.json_response([])
+
+    async def _frameworks_handler(self, request: web.Request) -> web.Response:
+        """List all available transformation frameworks."""
+        from .frameworks import list_frameworks
+        return web.json_response(list_frameworks())
 
     # External platforms like Discord disconnected by C2 architectural mandate
 

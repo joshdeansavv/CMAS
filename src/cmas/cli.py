@@ -36,30 +36,53 @@ async def run_server(config_path: str = None, port: int = None):
 
 
 async def run_once(goal: str, model: str = "gpt-4.1-nano", iterations: int = 3,
-                   max_agents: int = 4, human: bool = False, timezone: str = None):
-    """Run a single research task (one-shot mode)."""
-    from cmas.core.orchestrator import Orchestrator
+                   max_agents: int = 4, human: bool = False, timezone: str = None,
+                   mode: str = "composer"):
+    """Run a single task — either via Composer (CEO mode) or legacy Orchestrator."""
 
     project_dir = get_project_dir(goal)
 
-    print(f"\n  CMAS — One-Shot Research Mode")
-    print(f"  {'─'*40}")
-    print(f"  Goal: {goal}")
-    print(f"  Model: {model}")
-    print(f"  Project dir: {project_dir}")
-    print()
+    if mode == "composer":
+        from cmas.core.composer import Composer
 
-    orchestrator = Orchestrator(
-        project_dir=project_dir,
-        model=model,
-        agent_model=model,
-        max_iterations=iterations,
-        max_concurrent_agents=max_agents,
-        human_in_the_loop=human,
-        local_timezone=timezone,
-    )
+        print(f"\n  CMAS — Composer (CEO) Mode")
+        print(f"  {'─'*40}")
+        print(f"  Goal: {goal}")
+        print(f"  Model: {model}")
+        print(f"  Project dir: {project_dir}")
+        print()
 
-    result = await orchestrator.run(goal)
+        composer = Composer(
+            project_dir=project_dir,
+            model=model,
+            team_model=model,
+            max_teams=8,
+            max_agents_per_team=max_agents,
+        )
+
+        result = await composer.run(goal)
+    else:
+        from cmas.core.orchestrator import Orchestrator
+
+        print(f"\n  CMAS — Orchestrator (Legacy) Mode")
+        print(f"  {'─'*40}")
+        print(f"  Goal: {goal}")
+        print(f"  Model: {model}")
+        print(f"  Project dir: {project_dir}")
+        print()
+
+        orchestrator = Orchestrator(
+            project_dir=project_dir,
+            model=model,
+            agent_model=model,
+            max_iterations=iterations,
+            max_concurrent_agents=max_agents,
+            human_in_the_loop=human,
+            local_timezone=timezone,
+        )
+
+        result = await orchestrator.run(goal)
+
     print(f"\n{'─'*60}")
     print("FINAL OUTPUT:")
     print(f"{'─'*60}")
@@ -105,6 +128,8 @@ setup:
                         help="Enable human-in-the-loop (one-shot mode)")
     parser.add_argument("--timezone", type=str, default=None,
                         help="Timezone, e.g. America/New_York")
+    parser.add_argument("--legacy", action="store_true",
+                        help="Use legacy Orchestrator instead of Composer (CEO mode)")
 
     args = parser.parse_args()
 
@@ -114,9 +139,11 @@ setup:
         sys.exit(1)
 
     if args.run:
+        mode = "orchestrator" if args.legacy else "composer"
         asyncio.run(run_once(
             args.run, args.model, args.iterations,
             human=args.human, timezone=args.timezone,
+            mode=mode,
         ))
     else:
         asyncio.run(run_server(args.config, args.port))
