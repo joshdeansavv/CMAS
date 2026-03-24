@@ -98,8 +98,10 @@ else
 fi
 
 source .venv/bin/activate
-info "Installing dependencies..."
-pip install -q -r requirements.txt 2>&1 | tail -1 || true
+info "Upgrading pip..."
+.venv/bin/python3 -m pip install -q --upgrade pip 2>&1 | tail -1 || true
+info "Installing CMAS and dependencies..."
+.venv/bin/pip install -q -e ".[all]" 2>&1 | tail -1 || true
 ok "Dependencies installed"
 
 # ── Step 3: API Keys ─────────────────────────────────────────────
@@ -189,7 +191,7 @@ for choice in $CHANNEL_CHOICES; do
             echo ""
             if [ -n "$DISCORD_TOKEN" ]; then
                 DISCORD_ENABLED="true"
-                pip install -q "discord.py>=2.3"
+                .venv/bin/pip install -q "discord.py>=2.3"
                 ok "Discord Enabled"
             else
                 warn "Empty token, skipping Discord."
@@ -207,7 +209,7 @@ for choice in $CHANNEL_CHOICES; do
             read -r TWILIO_PHONE
             if [ -n "$TWILIO_SID" ]; then
                 WHATSAPP_ENABLED="true"
-                pip install -q "twilio>=8.0"
+                .venv/bin/pip install -q "twilio>=8.0"
                 ok "WhatsApp Enabled"
             fi
             ;;
@@ -219,7 +221,7 @@ echo ""
 echo -e "${BLUE}${BOLD}  [6/6] Finalizing...${NC}"
 
 # Autodetect timezone
-DETECTED_TZ=$(python3 -c "try:
+DETECTED_TZ=$(.venv/bin/python3 -c "try:
     import time; offset = time.timezone if time.daylight == 0 else time.altzone
     print(f'UTC{-offset//3600:+d}')
 except: print('UTC')" 2>/dev/null || echo "UTC")
@@ -267,8 +269,8 @@ channels:
     enabled: ${WHATSAPP_ENABLED}
 
 memory:
-  vector_db_path: "./data/vectors"
-  sqlite_path: "./data/cmas.db"
+  vector_db_path: "./.cmas/vectors"
+  sqlite_path: "./.cmas/cmas.db"
   max_context_messages: 50
 
 scheduler:
@@ -277,12 +279,22 @@ scheduler:
 CFGEOF
 ok "config.yaml saved."
 
-mkdir -p data/vectors data/projects workspace
-chmod -R 700 data workspace
+mkdir -p .cmas/vectors .cmas/projects .cmas/workspace
+chmod -R 700 .cmas
+
+# ── Build Web UI (optional) ────────────────────────────────────
+if command -v npm &> /dev/null && [ -f "web/package.json" ]; then
+    echo ""
+    echo -e "${BLUE}${BOLD}  Building Web UI...${NC}"
+    (cd web && npm install --silent && npm run build --silent) 2>&1 | tail -3
+    ok "Web UI built"
+else
+    warn "npm not found — web UI will not be available. Install Node.js to enable."
+fi
 
 echo ""
 echo -e "${GREEN}${BOLD}  ┌─────────────────────────────────────┐${NC}"
 echo -e "${GREEN}${BOLD}  │          Setup Complete!            │${NC}"
 echo -e "${GREEN}${BOLD}  └─────────────────────────────────────┘${NC}"
-echo "  Run ./start.sh to boot the AGI framework."
+echo "  Run ./start.sh to boot the server."
 echo ""

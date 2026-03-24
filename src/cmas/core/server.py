@@ -14,7 +14,7 @@ from .session import SessionManager
 from .chat import ChatHandler
 from ..channels.web import WebChannel
 
-WEB_DIR = Path(__file__).resolve().parent.parent / "web-app" / "dist"
+WEB_DIR = Path(__file__).resolve().parents[3] / "web" / "dist"
 
 
 class CMASServer:
@@ -95,6 +95,7 @@ class CMASServer:
         app.router.add_post("/api/tasks/{task_id}/stop", self._task_control_handler)
         app.router.add_get("/api/teams", self._teams_handler)
         app.router.add_get("/api/frameworks", self._frameworks_handler)
+        app.router.add_get("/api/usage", self._usage_handler)
 
         # External channels explicitly disabled to isolate localhost gateway
         return app
@@ -229,8 +230,13 @@ class CMASServer:
 
     async def _frameworks_handler(self, request: web.Request) -> web.Response:
         """List all available transformation frameworks."""
-        from .frameworks import list_frameworks
+        from ..frameworks import list_frameworks
         return web.json_response(list_frameworks())
+
+    async def _usage_handler(self, request: web.Request) -> web.Response:
+        """Return LLM token usage and cost estimates."""
+        from .llm import usage
+        return web.json_response(usage.summary())
 
     # External platforms like Discord disconnected by C2 architectural mandate
 

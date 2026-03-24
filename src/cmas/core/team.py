@@ -125,6 +125,30 @@ class Team:
             except Exception:
                 pass
 
+    async def _emit_team_event(self, event_type: str, data: dict = None):
+        """Emit a structured team event for the frontend."""
+        if self.progress_callback:
+            payload = {
+                "team_id": self.spec.id,
+                "team_name": self.spec.name,
+                "event": event_type,
+                "status": self.status,
+                "sub_agents": [
+                    {"id": sa.id, "name": sa.name, "role": sa.role, "status": sa.status}
+                    for sa in self.sub_agents.values()
+                ],
+                **(data or {}),
+            }
+            try:
+                # Encode as special progress text the frontend can parse
+                import json
+                await self.progress_callback(
+                    f"__team_event__{json.dumps(payload)}",
+                    f"Team:{self.spec.name}"
+                )
+            except Exception:
+                pass
+
     # ── Phase 1: Plan — Team Lead analyzes mission and plans staff ───
 
     async def plan(self) -> Dict:
@@ -138,7 +162,7 @@ class Team:
         if self.spec.depends_on:
             dep_context = "\n\nINPUT FROM OTHER TEAMS:\n"
             for dep_id in self.spec.depends_on:
-                msgs = self.hub.get_messages(f"team:{self.spec.id}")
+                msgs = self.hub.get_messages(f"team:{dep_id}")
                 for m in msgs:
                     if m.get("sender", "").startswith(f"team:{dep_id}"):
                         dep_context += f"  [{m['sender']}]: {m['content'][:500]}\n"
@@ -146,7 +170,7 @@ class Team:
         # Get framework guidance if specified
         framework_context = ""
         if self.spec.frameworks:
-            from .frameworks import apply_framework
+            from ..frameworks import apply_framework
             for fw_id in self.spec.frameworks[:2]:
                 framework_context += f"\n{apply_framework(fw_id, self.spec.mission)}\n"
 
@@ -175,8 +199,14 @@ You must decide:
 3. What specific task each sub-agent should do
 4. What order they should work in (dependencies)
 
-Think like a real team manager. You have a mission. You need to hire the right people.
-Don't hire more than you need. Each sub-agent is a specialist at one thing.
+CRITICAL RULES:
+- PREFER FEWER AGENTS. 1-2 agents is ideal for most missions. Only hire more if
+  the work is genuinely parallel and requires distinct expertise.
+- Each sub-agent gets a DETAILED task description — not vague. Tell them exactly
+  what to produce, what format, what sources to use, and what the output should contain.
+- Do NOT split work that a single agent could do sequentially. One focused agent
+  with a clear multi-step task is better than 3 agents doing thin slices.
+- A sub-agent's task description IS their entire context. Include all relevant details.
 
 Return JSON ONLY:
 {{
@@ -219,6 +249,11 @@ Return JSON ONLY:
         self._log(f"Strategy: {plan.get('strategy', 'N/A')[:80]}")
         self._log(f"Hiring {len(plan.get('sub_agents', []))} sub-agents")
         self.hub.remember(f"team:{self.spec.id}:plan", json.dumps(plan, indent=2))
+
+        await self._emit_team_event("planned", {
+            "strategy": plan.get("strategy", ""),
+            "planned_agents": len(plan.get("sub_agents", [])),
+        })
 
         return plan
 
@@ -292,6 +327,7 @@ Return JSON ONLY:
         await self._emit(
             f"Team '{self.spec.name}' has {len(agents)} sub-agents. Executing..."
         )
+        await self._emit_team_event("executing")
 
         # Execute in dependency order
         done_ids: set = set()
@@ -349,6 +385,7 @@ Return JSON ONLY:
                     done_ids.add(sa_id)
 
                     self._log(f"  Sub-agent {sa_id} complete ({len(result)} chars)")
+                    await self._emit_team_event("agent_done", {"completed_agent": sa_id})
                     return result
 
             await asyncio.gather(*(run_sub_agent(sa_id) for sa_id in ready))
@@ -402,6 +439,7 @@ Include key findings, recommendations, and any deliverables produced."""},
 
         self._log(f"DONE — Deliverable saved to {deliverable_path}")
         await self._emit(f"Team '{self.spec.name}' delivered results.")
+        await self._emit_team_event("done")
 
         return self.result
 

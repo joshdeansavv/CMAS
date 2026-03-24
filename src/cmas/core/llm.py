@@ -13,6 +13,52 @@ load_dotenv()
 
 _client = None
 
+# ── Token/Cost Tracking ─────────────────────────────────────────────
+# Approximate costs per 1M tokens (input/output) for common models
+MODEL_COSTS = {
+    "gpt-4.1-nano":  {"input": 0.10, "output": 0.40},
+    "gpt-4.1-mini":  {"input": 0.40, "output": 1.60},
+    "gpt-4.1":       {"input": 2.00, "output": 8.00},
+    "gpt-4o":        {"input": 2.50, "output": 10.00},
+    "gpt-4o-mini":   {"input": 0.15, "output": 0.60},
+}
+
+class UsageTracker:
+    """Track token usage and estimated costs across all LLM calls."""
+    def __init__(self):
+        self.total_input_tokens = 0
+        self.total_output_tokens = 0
+        self.total_calls = 0
+        self.estimated_cost_usd = 0.0
+        self._by_model = {}  # model -> {input, output, calls, cost}
+
+    def record(self, model: str, input_tokens: int, output_tokens: int):
+        self.total_input_tokens += input_tokens
+        self.total_output_tokens += output_tokens
+        self.total_calls += 1
+
+        costs = MODEL_COSTS.get(model, {"input": 1.0, "output": 4.0})
+        call_cost = (input_tokens * costs["input"] + output_tokens * costs["output"]) / 1_000_000
+        self.estimated_cost_usd += call_cost
+
+        if model not in self._by_model:
+            self._by_model[model] = {"input": 0, "output": 0, "calls": 0, "cost": 0.0}
+        self._by_model[model]["input"] += input_tokens
+        self._by_model[model]["output"] += output_tokens
+        self._by_model[model]["calls"] += 1
+        self._by_model[model]["cost"] += call_cost
+
+    def summary(self) -> dict:
+        return {
+            "total_calls": self.total_calls,
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
+            "estimated_cost_usd": round(self.estimated_cost_usd, 4),
+            "by_model": self._by_model,
+        }
+
+usage = UsageTracker()
+
 # ── Fallback Chain ───────────────────────────────────────────────────
 # If the primary model fails, try these in order
 FALLBACK_CHAINS = {
@@ -65,6 +111,9 @@ async def chat(
     for attempt in range(retries):
         try:
             response = await client.chat.completions.create(**kwargs)
+            # Track token usage
+            if hasattr(response, 'usage') and response.usage:
+                usage.record(model, response.usage.prompt_tokens or 0, response.usage.completion_tokens or 0)
             return response.choices[0].message
         except Exception as e:
             last_error = e
@@ -82,6 +131,8 @@ async def chat(
             try:
                 kwargs["model"] = fb_model
                 response = await client.chat.completions.create(**kwargs)
+                if hasattr(response, 'usage') and response.usage:
+                    usage.record(fb_model, response.usage.prompt_tokens or 0, response.usage.completion_tokens or 0)
                 print(f"[LLM] Fallback to {fb_model} succeeded")
                 return response.choices[0].message
             except Exception as e:

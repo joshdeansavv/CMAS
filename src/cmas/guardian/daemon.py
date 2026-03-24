@@ -35,8 +35,8 @@ GUARDIAN_DIR = Path(__file__).resolve().parent
 REPO_ROOT = GUARDIAN_DIR.parent.parent.parent  # src/cmas/guardian -> MAIN_FOLDER
 load_dotenv(REPO_ROOT / ".env")
 
-DB_PATH = REPO_ROOT / ".guardian" / "guardian.db"
-LOG_PATH = REPO_ROOT / ".guardian" / "guardian.log"
+DB_PATH = REPO_ROOT / ".cmas" / "guardian.db"
+LOG_PATH = REPO_ROOT / ".cmas" / "guardian.log"
 
 # ── Config ───────────────────────────────────────────────────────────
 MODEL_SURVEY = os.getenv("GUARDIAN_MODEL_SURVEY", "gpt-4.1-mini")
@@ -48,8 +48,8 @@ MAX_CONSECUTIVE_FAILURES = 5
 DRY_RUN = os.getenv("GUARDIAN_DRY_RUN", "").lower() in ("1", "true", "yes")
 
 # Source dirs to scan (relative to REPO_ROOT)
-SCAN_DIRS = ["src/cmas/core", "src/cmas/channels", "src/cmas/cli.py"]
-IGNORE_PATTERNS = {".pyc", "__pycache__", ".git", "node_modules", ".venv", "web-app/dist"}
+SCAN_DIRS = ["src/cmas/core", "src/cmas/channels", "src/cmas/frameworks", "src/cmas/cli.py"]
+IGNORE_PATTERNS = {".pyc", "__pycache__", ".git", "node_modules", ".venv", "web/dist"}
 
 
 # ═══════════════════════════════════════════════════════════════════════

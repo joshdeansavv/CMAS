@@ -93,6 +93,10 @@ class Orchestrator:
         self.consolidator = Consolidator(memory=self.memory, model=self.model)
         self.dmn = DefaultModeNetwork(memory=self.memory, model=self.model)
 
+        # Task tracking maps — initialized here so _prescreen_goal() can use them
+        self._task_agent_map: Dict[str, str] = {}
+        self._task_deps: Dict[str, list] = {}
+
         self._print("CMAS initialized (cognitive architecture + brain modules active)")
 
     def _get_current_date(self) -> str:

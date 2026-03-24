@@ -19,7 +19,7 @@ def get_project_dir(topic: str) -> Path:
     """Create a project directory for a research task."""
     safe_name = "".join(c if c.isalnum() or c in " _-" else "" for c in topic)
     safe_name = safe_name.strip().replace(" ", "_")[:60]
-    return _project_root() / "data" / "projects" / f"project_{safe_name}"
+    return _project_root() / ".cmas" / "projects" / f"project_{safe_name}"
 
 
 async def run_server(config_path: str = None, port: int = None):
@@ -56,8 +56,8 @@ async def run_once(goal: str, model: str = "gpt-4.1-nano", iterations: int = 3,
             project_dir=project_dir,
             model=model,
             team_model=model,
-            max_teams=8,
-            max_agents_per_team=max_agents,
+            max_teams=5,
+            max_agents_per_team=min(max_agents, 3),
         )
 
         result = await composer.run(goal)

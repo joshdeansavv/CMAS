@@ -75,10 +75,12 @@ class WebChannel:
 
     def _broadcast_status(self, name: str, status: str, task: str):
         project_id = ""
+        team_id = ""
         try:
             statuses = self.gateway.hub.get_agent_statuses()
             info = next((a for a in statuses if a["name"] == name), {})
             project_id = info.get("project_id", "")
+            team_id = info.get("team_id", "")
         except Exception:
             pass
         payload = {
@@ -87,9 +89,16 @@ class WebChannel:
             "status": status,
             "task": task,
             "project_id": project_id,
+            "team_id": team_id,
         }
         self._safe_push(self._push_to_project(payload, project_id))
         
+    def broadcast_team_event(self, event: dict):
+        """Broadcast a team lifecycle event to all relevant sessions."""
+        payload = {"type": "team_update", **event}
+        project_id = event.get("project_id", "")
+        self._safe_push(self._push_to_project(payload, project_id))
+
     async def push_to_all_json(self, payload: dict):
         for ws in list(self.connections.values()):
             if not ws.closed:
@@ -145,7 +154,17 @@ class WebChannel:
                     msg_type = data.get("type", "chat")
                     uid = data.get("user_id", user_id)
 
-                    if msg_type == "get_tasks":
+                    if msg_type == "get_teams":
+                        try:
+                            import json as _json
+                            teams_raw = self.gateway.hub.recall("composer:org_design")
+                            teams_data = _json.loads(teams_raw) if teams_raw else []
+                            await ws.send_json({"type": "teams_init", "teams": teams_data})
+                        except Exception:
+                            await ws.send_json({"type": "teams_init", "teams": []})
+                        continue
+
+                    elif msg_type == "get_tasks":
                         try:
                             proj_filter = data.get("project_id", project_id)
                             all_tasks = self.gateway.hub.get_all_tasks()
@@ -183,6 +202,9 @@ class WebChannel:
                         focus = data.get("focus", "")
                         try:
                             pid = self.gateway.hub.create_project(name, focus)
+                            # Update session→project mapping so events route correctly
+                            self._session_projects[session_id] = pid
+                            project_id = pid
                             await ws.send_json({"type": "project_created", "id": pid, "name": name, "focus": focus})
                         except Exception as e:
                             await ws.send_json({"type": "error", "text": f"Failed to create project: {e}"})

@@ -8,7 +8,7 @@ import aiohttp
 from pathlib import Path
 from dotenv import load_dotenv
 
-from .frameworks import (
+from ..frameworks import (
     select_and_apply as _fw_select_and_apply,
     apply_framework as _fw_apply,
     list_frameworks as _fw_list,

@@ -1,0 +1,59 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cmas"
+version = "0.1.0"
+description = "Cognitive Multi-Agent System — an always-on AI agent framework"
+readme = "README.md"
+license = "LicenseRef-PolyForm-Noncommercial-1.0.0"
+requires-python = ">=3.9"
+authors = [
+    { name = "CMAS Contributors" },
+]
+keywords = ["ai", "agents", "multi-agent", "llm", "orchestration"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "aiohttp>=3.9",
+    "openai>=1.0",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+search = ["tavily-python>=0.3"]
+vector = ["chromadb>=0.4"]
+guardian = ["openai>=1.0"]
+all = ["cmas[search,vector,guardian]"]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+cmas = "cmas.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cmas"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

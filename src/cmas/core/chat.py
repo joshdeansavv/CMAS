@@ -327,8 +327,14 @@ class ChatHandler:
         task = self._active_research_tasks.pop(project_id, None)
         if task and not task.done():
             task.cancel()
-            print(f"[ChatHandler] Cancelled orchestrator task for {project_id}")
-            return
+        # Also clear any stuck agent statuses for this project
+        try:
+            gateway = getattr(self, 'gateway', None)
+            if gateway and hasattr(gateway, 'hub'):
+                gateway.hub.stop_project_tasks(project_id)
+        except Exception as e:
+            print(f"[ChatHandler] Error clearing project tasks: {e}")
+        print(f"[ChatHandler] Cancelled orchestrator task for {project_id}")
         # Also sweep for any tasks whose key contains this project_id
         for key in list(self._active_research_tasks.keys()):
             if project_id and project_id in key:
@@ -543,8 +549,8 @@ class ChatHandler:
                         session.session_id, session.channel,
                         {"type": "progress", "text": text}
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[ChatHandler] Progress push failed: {e}")
 
         # ── Tool wrappers with progress feedback ─────────────────
         async def _web_search(query: str, max_results: int = 5, **kw) -> str:
@@ -675,13 +681,14 @@ class ChatHandler:
             from .agent import create_specialist_agent
             from cmas.cli import get_project_dir
             proj_dir = get_project_dir(task[:20])
+            gw = getattr(self, 'gateway', None)
             agent = create_specialist_agent(
                 f"Specialist_{specialty.replace(' ', '_')}",
                 specialty,
-                hub=self.gateway.hub if hasattr(self, 'gateway') else None,
+                hub=gw.hub if gw else None,
                 workspace=proj_dir,
                 model=self.model,
-                gateway=self.gateway if hasattr(self, 'gateway') else None,
+                gateway=gw,
                 memory=self.memory
             )
 
@@ -690,11 +697,14 @@ class ChatHandler:
                 id=f"delegated_{int(time.time())}",
                 description=task,
                 assigned_to=f"Specialist_{specialty.replace(' ', '_')}",
-                project_id=session.project_id,
+                project_id=session.project_id or "",
                 source_channel=session.channel,
             )
-            result = await agent.execute(agt_task)
-            return f"Delegation to {specialty} completed. Findings:\n{result}"
+            try:
+                result = await agent.execute(agt_task)
+                return f"Delegation to {specialty} completed. Findings:\n{result}"
+            except Exception as e:
+                return f"Delegation to {specialty} failed: {e}"
 
         handlers["create_reminder"] = handle_create_reminder
         handlers["create_scheduled_task"] = handle_create_scheduled_task
@@ -784,22 +794,39 @@ class ChatHandler:
                             session.session_id, session.channel,
                             {"type": "progress", "text": text, "agent": agent}
                         )
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"[ChatHandler] Composer progress push failed: {e}")
+
+            gateway = getattr(self, 'gateway', None)
+            if not gateway:
+                if self._push_callback:
+                    await self._push_callback(session.session_id, session.channel,
+                                              "System error: Gateway not initialized.")
+                return
 
             composer = Composer(
                 project_dir=project_dir,
                 model=self.config.research_model,
                 team_model=self.config.model,
-                max_teams=8,
-                max_agents_per_team=5,
-                hub=self.gateway.hub,
-                gateway=self.gateway,
+                max_teams=5,
+                max_agents_per_team=3,
+                hub=gateway.hub,
+                gateway=gateway,
                 memory=self.memory,
                 project_id=session.project_id,
                 progress_callback=_progress,
             )
             result = await composer.run(goal)
+
+            # Clear all agent statuses so they don't appear stale on refresh
+            if gateway and hasattr(gateway, 'hub'):
+                gateway.hub.stop_project_tasks(session.project_id)
+
+            # Store the research result in session history so it persists on refresh
+            self.sessions.add_message(
+                session.session_id, session.user_id, "assistant",
+                result[:10000], session.channel,
+            )
 
             if self._push_callback:
                 await self._push_callback(session.session_id, session.channel, result)
@@ -807,15 +834,17 @@ class ChatHandler:
         except asyncio.CancelledError:
             # Clean stop — notify the user and mark all project tasks killed
             print(f"[ChatHandler] Research cancelled for project {session.project_id}")
-            self.gateway.hub.stop_project_tasks(session.project_id)
+            gw = getattr(self, 'gateway', None)
+            if gw and hasattr(gw, 'hub'):
+                gw.hub.stop_project_tasks(session.project_id)
             if self._control_callback:
                 try:
                     await self._control_callback(
                         session.session_id, session.channel,
                         {"type": "progress", "text": "Swarm stopped by Mission Control.", "agent": "Orchestrator"}
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[ChatHandler] Cancel progress push failed: {e}")
         except Exception as e:
             if self._push_callback:
                 await self._push_callback(

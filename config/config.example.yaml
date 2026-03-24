@@ -32,13 +32,13 @@ channels:
     phone: ""                # your Twilio WhatsApp number
 
 memory:
-  vector_db_path: "./data/vectors"   # ChromaDB storage
-  sqlite_path: "./data/cmas.db"      # conversation + knowledge storage
-  max_context_messages: 50           # messages kept in active context
+  vector_db_path: "./.cmas/vectors"   # ChromaDB storage
+  sqlite_path: "./.cmas/cmas.db"      # conversation + knowledge storage
+  max_context_messages: 50            # messages kept in active context
 
 scheduler:
   enabled: true              # background reminders, cron, proactive behavior
   proactive_interval: 300    # seconds between proactive checks (5 min)
 
 workspace:
-  base_dir: "./workspace"    # where the agent saves files, projects, etc.
+  base_dir: "./.cmas/workspace"    # where the agent saves files, projects, etc.

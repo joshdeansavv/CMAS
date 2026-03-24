@@ -85,10 +85,10 @@ class Composer:
     def __init__(
         self,
         project_dir: Path,
-        model: str = "gpt-4.1-nano",
-        team_model: str = "gpt-4.1-nano",
-        max_teams: int = 8,
-        max_agents_per_team: int = 5,
+        model: str = "gpt-4.1-mini",      # Composer strategic decisions use smarter model
+        team_model: str = "gpt-4.1-nano",  # Sub-agents use cheapest model for execution
+        max_teams: int = 5,                 # Reduced from 8 — most goals need 2-4 teams
+        max_agents_per_team: int = 3,       # Reduced from 5 — prevents over-splitting
         hub: Optional[Hub] = None,
         gateway: Optional[Gateway] = None,
         memory: Optional[Memory] = None,
@@ -260,13 +260,16 @@ Design teams to accomplish this. Each team is led by a Team Manager agent
 who will hire their own sub-agents (employees).
 
 Rules:
+- LESS IS MORE. Use the FEWEST teams possible. 2-3 teams handles most goals.
+- Only create a team if it serves a genuinely distinct function.
 - Each team has ONE clear mission. No overlap.
 - Teams can depend on other teams' output.
 - Allocate specific tools and frameworks to each team based on what they need.
 - Don't over-allocate — teams should only get tools they'll actually use.
-- Max {self.max_teams} teams. Usually 2-5 is enough.
-- Each team gets a budget of 1-{self.max_agents_per_team} sub-agents.
-- Think about communication: which teams need to talk to each other?
+- Max {self.max_teams} teams. Prefer 2-3 unless the goal truly requires more.
+- Each team gets a budget of 1-{self.max_agents_per_team} sub-agents. Prefer 1-2.
+- A single focused agent often beats 3 scattered ones. Fewer, better agents.
+- Do NOT create monitoring/operations/HR teams unless you have 4+ substantive teams.
 
 AVAILABLE TOOLS: {json.dumps(ALL_AVAILABLE_TOOLS)}
 AVAILABLE FRAMEWORKS: {json.dumps(ALL_AVAILABLE_FRAMEWORKS)}
@@ -675,8 +678,18 @@ This is the final product. Make it excellent."""},
 
         elapsed = time.time() - start
         total_agents = sum(len(t.sub_agents) for t in self.teams.values())
+
+        # Report cost summary
         self._print(f"\n{'='*60}")
         self._print(f"COMPLETE — {len(self.teams)} teams, {total_agents} sub-agents, {elapsed:.0f}s")
+        try:
+            from .llm import usage as llm_usage
+            cost_summary = llm_usage.summary()
+            self._print(f"  LLM calls: {cost_summary['total_calls']}")
+            self._print(f"  Tokens: {cost_summary['total_input_tokens']:,} in / {cost_summary['total_output_tokens']:,} out")
+            self._print(f"  Estimated cost: ${cost_summary['estimated_cost_usd']:.4f}")
+        except Exception:
+            pass
         self._print(f"{'='*60}")
 
         return final

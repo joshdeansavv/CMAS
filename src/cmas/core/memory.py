@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 
 # Project root: src/cmas/core/memory.py -> parents[3] = project root
-MEMORY_DB_PATH = Path(__file__).resolve().parents[3] / "data" / "cmas_memory.db"
+MEMORY_DB_PATH = Path(__file__).resolve().parents[3] / ".cmas" / "cmas_memory.db"
 
 
 @dataclass
@@ -44,6 +44,7 @@ class Memory:
 
     def __init__(self, db_path: Optional[str] = None):
         self.db_path = Path(db_path) if db_path else MEMORY_DB_PATH
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.db_path))
         self._conn.row_factory = sqlite3.Row
         self.vector = None  # Optional VectorMemory instance, set externally

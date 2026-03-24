@@ -16,7 +16,7 @@ class VectorMemory:
     Runs fully embedded — no external service needed.
     """
 
-    def __init__(self, persist_dir: str = "./data/vectors"):
+    def __init__(self, persist_dir: str = "./.cmas/vectors"):
         if not HAS_CHROMADB:
             raise ImportError(
                 "chromadb is required for vector memory: pip install chromadb"

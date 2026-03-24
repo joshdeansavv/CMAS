@@ -4,9 +4,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Activate venv if it exists
-if [ -f .venv/bin/activate ]; then
-    source .venv/bin/activate
+# Check for venv
+if [ ! -f .venv/bin/python3 ]; then
+    echo ""
+    echo "  No virtual environment found. Run setup first:"
+    echo "    ./setup.sh"
+    echo ""
+    exit 1
 fi
 
 # Check for .env
@@ -18,7 +22,4 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
-# Add src to Python path
-export PYTHONPATH="${SCRIPT_DIR}/src${PYTHONPATH:+:$PYTHONPATH}"
-
-exec python3 -m cmas "$@"
+exec .venv/bin/python3 -m cmas "$@"
